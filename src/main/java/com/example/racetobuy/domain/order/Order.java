@@ -1,6 +1,6 @@
 package com.example.racetobuy.domain.order;
 
-import com.example.racetobuy.domain.member.Member;
+import com.example.racetobuy.domain.member.entity.Member;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
