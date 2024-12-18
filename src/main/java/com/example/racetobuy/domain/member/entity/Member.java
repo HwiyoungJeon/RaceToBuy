@@ -1,4 +1,4 @@
-package com.example.racetobuy.domain.member;
+package com.example.racetobuy.domain.member.entity;
 
 import com.example.racetobuy.domain.order.Order;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
@@ -31,10 +31,10 @@ public class Member extends TimeStamp {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "phone_number", length = 20)
+    @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;
 
-    @Column(name = "address", columnDefinition = "TEXT")
+    @Column(name = "address", nullable = false, columnDefinition = "TEXT")
     private String address;
 
     @OneToMany(mappedBy = "member")
@@ -42,5 +42,13 @@ public class Member extends TimeStamp {
 
     @OneToMany(mappedBy = "member")
     private List<Wishlist> wishlists = new ArrayList<>();
+
+    public Member(String username, String email, String password, String phoneNumber, String address) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.phoneNumber = phoneNumber;
+        this.address = address;
+    }
 
 }
