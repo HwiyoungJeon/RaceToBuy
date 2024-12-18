@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: src/docker/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://{dockerName}:3307/racetobuy
+      SPRING_DATASOURCE_USERNAME: {SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: {SPRING_DATASOURCE_PASSWORD}
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: {MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: racetobuy
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    command: --default-authentication-plugin=mysql_native_password
+
+networks:
+  app-network:
+
+volumes:
+  mysql_data:
