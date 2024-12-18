@@ -13,6 +13,7 @@ import java.util.List;
 
 @Getter
 @Entity
+@Table(name = "member")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Member extends TimeStamp {
 
