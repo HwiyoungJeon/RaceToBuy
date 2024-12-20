@@ -1,6 +1,7 @@
 package com.example.racetobuy.service.member;
 
 import com.example.racetobuy.domain.member.dto.MemberSignupRequest;
+import com.example.racetobuy.domain.member.dto.UpdatePasswordRequest;
 import com.example.racetobuy.global.util.ApiResponse;
 
 public interface AuthService {
@@ -36,32 +37,32 @@ public interface AuthService {
      * @param password 비밀번호
      * @return JWT 토큰을 담은 응답
      */
-//    ApiResponse<?> login(String email, String password);
+    ApiResponse<?> login(String email, String password, String role);
 
     /**
      * 로그아웃 메서드 (현재 기기에서만 로그아웃)
      *
-     * @param token JWT 토큰
+     * @param accessToken 토큰
      * @return 성공 응답
      */
-//    ApiResponse<?> logout(String token);
+     ApiResponse<?> logout(String accessToken);
 
     /**
      * 비밀번호 변경 및 모든 기기 로그아웃 메서드
      *
-     * @param memberId    회원 ID
-     * @param oldPassword 기존 비밀번호
-     * @param newPassword 새 비밀번호
+     * @param accessToken  토큰
+     * @param request 기존 비밀번호
+     * @param request 새 비밀번호
      * @return 성공 응답
      */
-//    ApiResponse<?> updatePassword(Long memberId, String oldPassword, String newPassword);
+    ApiResponse<?> updatePassword(String accessToken, UpdatePasswordRequest request);
 
     /**
      * 모든 기기에서 로그아웃 메서드
      *
-     * @param memberId 회원 ID
+     * @param accessToken  토큰
      * @return 성공 응답
      */
-//    ApiResponse<?> allDevicesLogout(Long memberId);
+    ApiResponse<?> logoutAllDevices(String accessToken);
 
 }

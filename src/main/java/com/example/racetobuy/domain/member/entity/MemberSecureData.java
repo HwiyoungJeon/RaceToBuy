@@ -41,4 +41,7 @@ public class MemberSecureData extends TimeStamp {
         this.nameHash = nameHash;
         this.addressHash = addressHash;
     }
+    public void updatePasswordHash(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
 }
