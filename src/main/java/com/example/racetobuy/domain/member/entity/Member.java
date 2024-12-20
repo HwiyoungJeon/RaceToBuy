@@ -6,6 +6,7 @@ import com.example.racetobuy.domain.wishlist.Wishlist;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -49,12 +50,19 @@ public class Member extends TimeStamp {
     @OneToMany(mappedBy = "member")
     private List<Wishlist> wishlists = new ArrayList<>();
 
-    public Member(String username, String email, String password, String phoneNumber, String address) {
+    @Builder
+    public Member(Long memberId,String username, String email, String password, String phoneNumber, String address) {
+        this.memberId = memberId;
         this.username = username;
         this.email = email;
         this.password = password;
         this.phoneNumber = phoneNumber;
         this.address = address;
     }
+
+    public void updatePassword(String newPassword) {
+        this.password = newPassword;
+    }
+
 
 }

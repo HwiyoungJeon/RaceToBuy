@@ -23,6 +23,7 @@ public class ApiResponse<T> {
     private String message;
     private T data;
 
+
     public static ApiResponse createSuccess() {
         return new ApiResponse(HttpStatus.CREATED.value(), SUCCESS_MESSAGE, null);
     }
@@ -57,4 +58,23 @@ public class ApiResponse<T> {
     public static ApiResponse<String> createException(ErrorCode errorCode) {
         return new ApiResponse<>(errorCode.getStatusCode(), errorCode.getMessage(), null);
     }
+
+    /**
+     * 🔥 addData 메서드 (data를 Map으로 확장하여 추가 데이터 삽입)
+     *
+     * @param key   데이터 키 (예: accessToken)
+     * @param value 데이터 값 (예: jwt 토큰 값)
+     * @return ApiResponse 자기 자신을 반환하여 체이닝 가능
+     */
+    @SuppressWarnings("unchecked")
+    public ApiResponse<Map<String, Object>> addData(String key, Object value) {
+        if (!(this.data instanceof Map)) {
+            Map<String, Object> newData = new HashMap<>();
+            newData.put("message", this.data); // 🔥 기존 데이터가 있다면 message로 추가
+            this.data = (T) newData;
+        }
+        ((Map<String, Object>) this.data).put(key, value);
+        return (ApiResponse<Map<String, Object>>) this;
+    }
+
 }
