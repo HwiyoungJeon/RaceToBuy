@@ -31,7 +31,8 @@ public class SecurityConfig {
         httpSecurity.formLogin(AbstractHttpConfigurer::disable);
 
         httpSecurity.authorizeHttpRequests((request) -> request
-                .requestMatchers(new AntPathRequestMatcher("/api/members/signup/**")
+                .requestMatchers(new AntPathRequestMatcher("/auth/**"),
+                        new AntPathRequestMatcher("/login/**")
                 ).permitAll()
                 .anyRequest().authenticated());
         return httpSecurity.build();
