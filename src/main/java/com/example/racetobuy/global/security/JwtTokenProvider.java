@@ -113,6 +113,10 @@ public class JwtTokenProvider {
     // 액세스 토큰의 만료 시간 (만료 시간 반환)
     public long getExpiration(String token) {
         try {
+            // Bearer로 시작하면 제거
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7); // "Bearer " 이후의 문자열 추출
+            }
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
