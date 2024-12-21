@@ -2,12 +2,14 @@ package com.example.racetobuy.domain.member.dto;
 
 
 import com.example.racetobuy.global.constant.RoleToken;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
 @Getter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MemberSignupRequest {
 
     @NotBlank(message = "이름은 필수 입력값입니다.")

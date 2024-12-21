@@ -205,15 +205,15 @@ public class AuthServiceImpl implements AuthService {
 
             // 남은 시간이 1일(24 * 60 * 60 = 86400초) 이하일 때만 새로 발급
             if (remainingTime <= 86400) {
-                refreshToken = jwtTokenProvider.createRefreshToken(member,role);
+                refreshToken = jwtTokenProvider.createRefreshToken(member, role);
                 existingToken.updateToken(refreshToken);
             } else {
                 refreshToken = existingToken.getToken();
             }
         } else {
             // Refresh Token이 없을 때는 새로 생성
-            refreshToken = jwtTokenProvider.createRefreshToken(member,role);
-            RefreshToken newRefreshToken = new RefreshToken(member, refreshToken.replace("Bearer ", ""));
+            refreshToken = jwtTokenProvider.createRefreshToken(member, role);
+            RefreshToken newRefreshToken = new RefreshToken(member, refreshToken);
             refreshTokenRepository.save(newRefreshToken);
         }
 
@@ -256,9 +256,6 @@ public class AuthServiceImpl implements AuthService {
     public ApiResponse<?> logoutAllDevices(String accessToken) {
         Long memberId = AuthenticationUtil.getMemberId();
 
-
-        refreshTokenRepository.deleteAllByMember_MemberId(memberId);
-
         String token = accessToken.replace("Bearer ", "");
         long expiration = jwtTokenProvider.getExpiration(token);
         long remainingTime = expiration - System.currentTimeMillis();
@@ -272,13 +269,18 @@ public class AuthServiceImpl implements AuthService {
 
         // DB에서 리프레시 토큰 조회
         refreshTokenRepository.findByMember_MemberId(memberId).ifPresent(refreshToken -> {
+            String rawToken = refreshToken.getToken();
+
+            if (rawToken.startsWith("Bearer ")) {
+                rawToken = rawToken.substring(7); // "Bearer " 이후의 부분 추출
+            }
             // 리프레시 토큰의 만료 시간 가져오기
-            long refreshTokenExpiration = jwtTokenProvider.getExpiration(refreshToken.getToken());
+            long refreshTokenExpiration = jwtTokenProvider.getExpiration(rawToken);
             long refreshTokenRemainingTime = refreshTokenExpiration - System.currentTimeMillis();
 
             // Redis에 리프레시 토큰 블랙리스트 추가
             redisTemplate.opsForValue().set(
-                    BLACKLIST_PREFIX + refreshToken.getToken(),
+                    BLACKLIST_PREFIX + rawToken,
                     "LOGOUT_ALL_REFRESH",
                     Duration.ofMillis(refreshTokenRemainingTime) // 리프레시 토큰 남은 유효 시간만큼 Redis에 유지
             );
@@ -286,8 +288,6 @@ public class AuthServiceImpl implements AuthService {
             // DB에서 리프레시 토큰 삭제
             refreshTokenRepository.delete(refreshToken);
         });
-
-        refreshTokenRepository.deleteAllByMember_MemberId(memberId);
         return ApiResponse.success("모든 기기에서 로그아웃 되었습니다.");
     }
 
@@ -331,13 +331,18 @@ public class AuthServiceImpl implements AuthService {
 
         // DB에서 리프레시 토큰 조회
         refreshTokenRepository.findByMember_MemberId(memberId).ifPresent(refreshToken -> {
+
+            String rawToken = refreshToken.getToken();
+            if (rawToken.startsWith("Bearer ")) {
+                rawToken = rawToken.substring(7); // "Bearer " 이후의 부분 추출
+            }
             // 리프레시 토큰의 만료 시간 가져오기
-            long refreshTokenExpiration = jwtTokenProvider.getExpiration(refreshToken.getToken());
+            long refreshTokenExpiration = jwtTokenProvider.getExpiration(rawToken);
             long refreshTokenRemainingTime = refreshTokenExpiration - System.currentTimeMillis();
 
             // Redis에 리프레시 토큰 블랙리스트 추가
             redisTemplate.opsForValue().set(
-                    BLACKLIST_PREFIX + refreshToken.getToken(),
+                    BLACKLIST_PREFIX + rawToken,
                     "LOGOUT_ALL_REFRESH",
                     Duration.ofMillis(refreshTokenRemainingTime) // 리프레시 토큰 남은 유효 시간만큼 Redis에 유지
             );
@@ -386,7 +391,6 @@ public class AuthServiceImpl implements AuthService {
 
         return ApiResponse.success(tokens);
     }
-
 
 
     private boolean isTokenBlacklisted(String token) {
