@@ -1,4 +1,4 @@
-package com.example.racetobuy.domain.product;
+package com.example.racetobuy.domain.product.entity;
 
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Entity
@@ -25,10 +27,13 @@ public class Product extends TimeStamp {
     @Column(name = "product_description", columnDefinition = "TEXT")
     private String productDescription;
 
-    @Column(name = "price", nullable = false, precision = 10, scale = 2)
+    @Column(name = "price", nullable = false, columnDefinition = "DECIMAL(10,2)")
     private BigDecimal price;
 
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
+
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<EventProduct> eventProducts = new ArrayList<>();
 
 }

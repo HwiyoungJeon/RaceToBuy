@@ -1,7 +1,7 @@
 package com.example.racetobuy.domain.wishlist;
 
 import com.example.racetobuy.domain.member.entity.Member;
-import com.example.racetobuy.domain.product.Product;
+import com.example.racetobuy.domain.product.entity.Product;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
