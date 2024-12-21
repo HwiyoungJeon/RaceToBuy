@@ -4,6 +4,7 @@ import com.example.racetobuy.global.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -42,6 +43,18 @@ public class SecurityConfig {
                 .requestMatchers(new AntPathRequestMatcher("/auth/**"),
                         new AntPathRequestMatcher("/login/**")
                 ).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/refresh"))
+                .access((authentication, context) -> {
+                    // 헤더에서 Refresh-Token 가져오기
+                    String refreshToken = context.getRequest().getHeader("Refresh-Token");
+
+                    // Refresh-Token 검증 로직 (단순히 null 체크 예시)
+                    if (refreshToken != null && !refreshToken.trim().isEmpty()) {
+                        return new AuthorizationDecision(true); // 접근 허용
+                    } else {
+                        return new AuthorizationDecision(false); // 접근 거부
+                    }
+                })
                 .anyRequest().authenticated());
 
         httpSecurity.logout(httpSecurityLogoutConfigurer -> httpSecurityLogoutConfigurer.disable());

@@ -12,13 +12,14 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.security.SignatureException;
 import java.util.Date;
 
 
 @Component
 public class JwtTokenProvider {
     public static final Long REFRESH_EXP = 1000L * 60 * 60 * 24 * 7;
-    public static final Long ACCESS_EXP = 1000L * 60 * 60;
+    public static final Long ACCESS_EXP = 1000L * 60 * 60 * 24;
     public static final String TOKEN_PREFIX = "Bearer ";
     public static final String HEADER = "Authorization";
 
@@ -39,6 +40,7 @@ public class JwtTokenProvider {
         claims.put("id", member.getMemberId());
         claims.put("email", member.getEmail());
         claims.put("role", roleToken.getName()); // 역할 추가
+        claims.put("type", "ACCESS");
 
         String jwt = Jwts.builder()
                 .setClaims(claims)
@@ -53,10 +55,12 @@ public class JwtTokenProvider {
     /**
      * 🔥 RefreshToken 생성 메서드
      */
-    public String createRefreshToken(Member member) {
+    public String createRefreshToken(Member member, String role) {
         Claims claims = Jwts.claims();
         claims.put("id", member.getMemberId());
         claims.put("email", member.getEmail());
+        claims.put("role", role);
+        claims.put("type", "REFRESH");
 
         String jwt = Jwts.builder()
                 .setClaims(claims)
@@ -108,13 +112,66 @@ public class JwtTokenProvider {
 
     // 액세스 토큰의 만료 시간 (만료 시간 반환)
     public long getExpiration(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(secretKey) // 시크릿 키로 서명 확인
-                .parseClaimsJws(token) // 토큰 파싱
-                .getBody(); // Claims(페이로드) 가져오기
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            return claims.getExpiration().getTime(); // 만료 시간 반환
+        } catch (Exception e) {
+            System.out.println("Failed to parse JWT: {}" + e.getMessage());
+            throw new JwtException(ErrorCode.JWT_INVALID);
+        }
+    }
 
-        // 'exp'는 JWT의 만료 시간 (Unix Time)으로, 밀리초 단위로 반환
-        return claims.getExpiration().getTime();
+    public String getRoleFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(secretKey)
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("role", String.class);
+    }
+
+    // 토큰 타입 반환
+    public String getTokenType(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(secretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.get("type", String.class); // "type" 클레임에서 값 추출
+    }
+
+    // Refresh Token 유효성 확인
+    public boolean validateRefreshToken(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            // "type" 클레임이 "REFRESH"인지 확인
+            String type = claims.get("type", String.class);
+            if (!"REFRESH".equals(type)) {
+                return false;
+            }
+
+            // 토큰 만료 여부 확인
+            Date expiration = claims.getExpiration();
+            if (expiration.before(new Date())) {
+                return false; // 토큰이 만료됨
+            }
+            return true;
+        } catch (JwtException e) {
+            System.out.println("Invalid Refresh Token: {}" + e.getMessage());
+            return false; // 서명 오류
+        } catch (Exception e) {
+            System.out.println("Refresh Token Validation Error: {}" + e.getMessage());
+            return false; // 기타 오류
+        }
     }
 
 

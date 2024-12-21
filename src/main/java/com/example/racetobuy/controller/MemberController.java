@@ -119,4 +119,9 @@ public class MemberController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh")
+    public ApiResponse<?> refreshAccessToken(@RequestHeader("Refresh-Token") String refreshToken) {
+        return authService.refreshAccessToken(refreshToken);
+    }
+
 }

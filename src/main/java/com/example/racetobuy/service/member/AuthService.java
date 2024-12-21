@@ -65,4 +65,11 @@ public interface AuthService {
      */
     ApiResponse<?> logoutAllDevices(String accessToken);
 
+    /**
+     * 리플레쉬 토큰존재시 액세스 토큰 자동 발급
+     *
+     * @param refreshToken  토큰
+     * @return 성공 응답
+     */
+    ApiResponse<?> refreshAccessToken(String refreshToken);
 }

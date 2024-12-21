@@ -136,6 +136,9 @@ public class AuthServiceImpl implements AuthService {
         String encryptedAddress = aesUtil.encrypt(request.getAddress());
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
 
+        // RoleToken 변환
+        RoleToken roleToken = request.getRoleToken();
+
         // 회원 엔티티 생성 및 저장
         Member member = Member.builder()
                 .username(encryptedName)
@@ -143,6 +146,7 @@ public class AuthServiceImpl implements AuthService {
                 .password(encryptedPassword)
                 .phoneNumber(request.getPhoneNumber())
                 .address(encryptedAddress)
+                .role(roleToken)
                 .build();
 
         memberRepository.save(member);
@@ -201,15 +205,15 @@ public class AuthServiceImpl implements AuthService {
 
             // 남은 시간이 1일(24 * 60 * 60 = 86400초) 이하일 때만 새로 발급
             if (remainingTime <= 86400) {
-                refreshToken = jwtTokenProvider.createRefreshToken(member);
+                refreshToken = jwtTokenProvider.createRefreshToken(member,role);
                 existingToken.updateToken(refreshToken);
             } else {
                 refreshToken = existingToken.getToken();
             }
         } else {
             // Refresh Token이 없을 때는 새로 생성
-            refreshToken = jwtTokenProvider.createRefreshToken(member);
-            RefreshToken newRefreshToken = new RefreshToken(member, refreshToken);
+            refreshToken = jwtTokenProvider.createRefreshToken(member,role);
+            RefreshToken newRefreshToken = new RefreshToken(member, refreshToken.replace("Bearer ", ""));
             refreshTokenRepository.save(newRefreshToken);
         }
 
@@ -259,12 +263,31 @@ public class AuthServiceImpl implements AuthService {
         long expiration = jwtTokenProvider.getExpiration(token);
         long remainingTime = expiration - System.currentTimeMillis();
 
+
         redisTemplate.opsForValue().set(
                 BLACKLIST_PREFIX + token,
                 "LOGOUT_ALL",
                 Duration.ofMillis(remainingTime)
         );
 
+        // DB에서 리프레시 토큰 조회
+        refreshTokenRepository.findByMember_MemberId(memberId).ifPresent(refreshToken -> {
+            // 리프레시 토큰의 만료 시간 가져오기
+            long refreshTokenExpiration = jwtTokenProvider.getExpiration(refreshToken.getToken());
+            long refreshTokenRemainingTime = refreshTokenExpiration - System.currentTimeMillis();
+
+            // Redis에 리프레시 토큰 블랙리스트 추가
+            redisTemplate.opsForValue().set(
+                    BLACKLIST_PREFIX + refreshToken.getToken(),
+                    "LOGOUT_ALL_REFRESH",
+                    Duration.ofMillis(refreshTokenRemainingTime) // 리프레시 토큰 남은 유효 시간만큼 Redis에 유지
+            );
+
+            // DB에서 리프레시 토큰 삭제
+            refreshTokenRepository.delete(refreshToken);
+        });
+
+        refreshTokenRepository.deleteAllByMember_MemberId(memberId);
         return ApiResponse.success("모든 기기에서 로그아웃 되었습니다.");
     }
 
@@ -296,9 +319,6 @@ public class AuthServiceImpl implements AuthService {
 
         memberSecureData.updatePasswordHash(hashedNewPassword); // MemberSecureData 테이블의 비밀번호 해시 변경
 
-        //모든 기기에서의 Refresh Token 삭제
-        refreshTokenRepository.deleteAllByMember_MemberId(memberId);
-
         String token = accessToken.replace("Bearer ", "");
         long expiration = jwtTokenProvider.getExpiration(token);
         long remainingTime = expiration - System.currentTimeMillis();
@@ -309,8 +329,69 @@ public class AuthServiceImpl implements AuthService {
                 Duration.ofMillis(remainingTime)
         );
 
+        // DB에서 리프레시 토큰 조회
+        refreshTokenRepository.findByMember_MemberId(memberId).ifPresent(refreshToken -> {
+            // 리프레시 토큰의 만료 시간 가져오기
+            long refreshTokenExpiration = jwtTokenProvider.getExpiration(refreshToken.getToken());
+            long refreshTokenRemainingTime = refreshTokenExpiration - System.currentTimeMillis();
+
+            // Redis에 리프레시 토큰 블랙리스트 추가
+            redisTemplate.opsForValue().set(
+                    BLACKLIST_PREFIX + refreshToken.getToken(),
+                    "LOGOUT_ALL_REFRESH",
+                    Duration.ofMillis(refreshTokenRemainingTime) // 리프레시 토큰 남은 유효 시간만큼 Redis에 유지
+            );
+
+            //모든 기기에서의 Refresh Token 삭제
+            refreshTokenRepository.deleteAllByMember_MemberId(memberId);
+        });
+
 
         return ApiResponse.success("비밀번호 변경 및 모든 기기 로그아웃 되었습니다.");
+    }
+
+    /**
+     * 리플레쉬 토큰존재시 액세스 토큰 자동 발급
+     */
+    @Override
+    public ApiResponse<?> refreshAccessToken(String refreshToken) {
+        // 토큰에서 Bearer 제거
+        refreshToken = refreshToken.replace(JwtTokenProvider.TOKEN_PREFIX, "");
+
+        //  블랙리스트 확인
+        if (isTokenBlacklisted(refreshToken)) {
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_BLACKLISTED);
+        }
+
+        // 3리프레시 토큰 유효성 검증
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new BusinessException(ErrorCode.JWT_INVALID);
+        }
+
+        // 리프레시 토큰에서 사용자 정보 추출
+        Long memberId = jwtTokenProvider.getMemberIdFromToken(refreshToken);
+        String role = jwtTokenProvider.getRoleFromToken(refreshToken);
+
+        //  사용자 조회
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        //  새로운 액세스 토큰 생성
+        String newAccessToken = jwtTokenProvider.createAccessToken(member, role);
+
+        // 7응답 반환
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", newAccessToken);
+        tokens.put("refreshToken", JwtTokenProvider.TOKEN_PREFIX + refreshToken);
+
+        return ApiResponse.success(tokens);
+    }
+
+
+
+    private boolean isTokenBlacklisted(String token) {
+        String blacklistKey = BLACKLIST_PREFIX + token;
+        return redisTemplate.opsForValue().get(blacklistKey) != null;
     }
 
     /**
@@ -327,6 +408,7 @@ public class AuthServiceImpl implements AuthService {
                 Duration.ofMillis(remainingTime)
         );
     }
+
 
 }
 
