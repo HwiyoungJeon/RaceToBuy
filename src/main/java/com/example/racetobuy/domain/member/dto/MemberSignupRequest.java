@@ -1,6 +1,7 @@
 package com.example.racetobuy.domain.member.dto;
 
 
+import com.example.racetobuy.global.constant.RoleToken;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -26,4 +27,14 @@ public class MemberSignupRequest {
 
     @NotBlank(message = "전화번호는 필수 입력값입니다.")
     private String phoneNumber;
+
+    @NotBlank(message = "룰은 필수 입력값입니다.")
+    private String role;
+
+    /**
+     * Role을 Enum으로 변환하여 반환
+     */
+    public RoleToken getRoleToken() {
+        return RoleToken.findByName(this.role);
+    }
 }

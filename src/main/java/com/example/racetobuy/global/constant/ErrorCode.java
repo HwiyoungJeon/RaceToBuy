@@ -23,6 +23,7 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원 정보를 찾을 수 없습니다."),
     PASSWORD_SAME_AS_OLD(HttpStatus.BAD_REQUEST, "새로운 비밀번호는 기존 비밀번호와 같을 수 없습니다."),
     AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증 정보가 필요합니다."),
+    REFRESH_TOKEN_BLACKLISTED(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 블랙리스트에 등록되었습니다."),
 
 
 

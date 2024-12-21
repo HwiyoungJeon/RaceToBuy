@@ -3,6 +3,7 @@ package com.example.racetobuy.domain.member.entity;
 import com.example.racetobuy.domain.order.Order;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import com.example.racetobuy.domain.wishlist.Wishlist;
+import com.example.racetobuy.global.constant.RoleToken;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AccessLevel;
@@ -44,6 +45,10 @@ public class Member extends TimeStamp {
     @Column(name = "address", nullable = false, columnDefinition = "TEXT")
     private String address;
 
+    @Enumerated(EnumType.STRING) // Enum을 String으로 매핑
+    @Column(name = "role", nullable = false, length = 10)
+    private RoleToken role;
+
     @OneToMany(mappedBy = "member")
     private List<Order> orders = new ArrayList<>();
 
@@ -51,18 +56,22 @@ public class Member extends TimeStamp {
     private List<Wishlist> wishlists = new ArrayList<>();
 
     @Builder
-    public Member(Long memberId,String username, String email, String password, String phoneNumber, String address) {
+    public Member(Long memberId, String username, String email, String password, String phoneNumber, String address, RoleToken role) {
         this.memberId = memberId;
         this.username = username;
         this.email = email;
         this.password = password;
         this.phoneNumber = phoneNumber;
         this.address = address;
+        this.role = role;
     }
 
     public void updatePassword(String newPassword) {
         this.password = newPassword;
     }
 
+    public void updateRole(RoleToken newRole) { // Role 업데이트 메서드
+        this.role = newRole;
+    }
 
 }

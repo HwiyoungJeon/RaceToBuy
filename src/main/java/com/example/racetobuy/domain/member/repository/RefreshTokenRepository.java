@@ -15,5 +15,13 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Modifying
     @Transactional
     void deleteAllByMember_MemberId(Long memberId);
+
+    /**
+     * Member ID로 리프레시 토큰 조회
+     *
+     * @param memberId 회원 ID
+     * @return 리프레시 토큰(Optional)
+     */
+    Optional<RefreshToken> findByMember_MemberId(Long memberId);
 }
 
