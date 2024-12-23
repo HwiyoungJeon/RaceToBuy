@@ -6,8 +6,6 @@ import com.example.racetobuy.global.constant.ErrorCode;
 import com.example.racetobuy.global.exception.BusinessException;
 import com.example.racetobuy.global.util.ApiResponse;
 import com.example.racetobuy.service.member.AuthService;
-import com.example.racetobuy.service.member.AuthServiceImpl;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

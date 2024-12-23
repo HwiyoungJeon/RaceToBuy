@@ -1,10 +1,11 @@
-package com.example.racetobuy.domain.wishlist;
+package com.example.racetobuy.domain.wishlist.entity;
 
 import com.example.racetobuy.domain.member.entity.Member;
 import com.example.racetobuy.domain.product.entity.Product;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -27,4 +28,17 @@ public class Wishlist extends TimeStamp {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    /**
+     * 위시리스트 생성 메서드
+     * @param member 위시리스트 소유 회원
+     * @param product 위시리스트에 등록할 상품
+     * @return Wishlist 객체
+     */
+    @Builder
+    public static Wishlist createWishlist(Member member, Product product) {
+        Wishlist wishlist = new Wishlist();
+        wishlist.member = member;
+        wishlist.product = product;
+        return wishlist;
+    }
 }

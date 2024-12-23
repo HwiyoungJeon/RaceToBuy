@@ -36,7 +36,19 @@ public enum ErrorCode {
     UNKNOWN_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류가 발생했습니다."),
 
     //상품 관련 에러 코드
-    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다.");
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+
+
+    // 위시리스트 관련 에러
+    WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "위시리스트에서 해당 항목을 찾을 수 없습니다."),
+    PRODUCT_ALREADY_IN_WISHLIST(HttpStatus.CONFLICT, "해당 상품이 이미 위시리스트에 존재합니다."),
+
+    // 재고 관련 에러
+    STOCK_NOT_ENOUGH(HttpStatus.BAD_REQUEST, "상품의 재고가 부족합니다."),
+    INVALID_QUANTITY(HttpStatus.BAD_REQUEST, "수량은 0보다 커야 합니다."),
+
+    ;
+
 
     private final HttpStatus httpStatus;
     private final String message;

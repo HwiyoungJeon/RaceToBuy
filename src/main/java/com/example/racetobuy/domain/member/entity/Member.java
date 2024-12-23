@@ -2,7 +2,7 @@ package com.example.racetobuy.domain.member.entity;
 
 import com.example.racetobuy.domain.order.Order;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
-import com.example.racetobuy.domain.wishlist.Wishlist;
+import com.example.racetobuy.domain.wishlist.entity.Wishlist;
 import com.example.racetobuy.global.constant.RoleToken;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;

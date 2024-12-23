@@ -29,7 +29,7 @@ public class ProductServiceImpl implements ProductService {
      * @param cursor 현재 페이지를 결정하는 커서 값 (0 이하일 경우 첫 페이지로 처리)
      * @param size   한 페이지에 표시할 상품 수
      * @return PagedResponseDTO<ProductWithEventDTO> 상품 목록 및 다음 커서 정보
-     *
+     * <p>
      * 동작 방식:
      * - 전체 상품 데이터를 정렬하여 조회합니다.
      * - 커서 값과 페이지 크기를 기반으로 데이터를 슬라이싱합니다.
@@ -60,9 +60,8 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
 
         // 다음 커서 계산
-        Long nextCursor = paginatedProducts.size() < size ? null : cursor + 1;
 
-        return new PagedResponseDTO<>(nextCursor, size, productDtos);
+        return new PagedResponseDTO<>(cursor, size, productDtos);
     }
 
     /**
@@ -70,7 +69,7 @@ public class ProductServiceImpl implements ProductService {
      *
      * @param productId 조회할 상품의 고유 ID
      * @return ProductWithEventDTO 상품의 상세 정보와 관련 이벤트 정보
-     *
+     * <p>
      * 동작 방식:
      * - 상품 ID로 상품 데이터를 조회합니다.
      * - 상품이 존재하지 않을 경우 적절한 예외를 반환합니다.
@@ -86,13 +85,12 @@ public class ProductServiceImpl implements ProductService {
     }
 
 
-
     /**
      * 공통 매핑 로직: Product -> ProductWithEventDTO
      *
      * @param product 변환할 Product 엔티티
      * @return ProductWithEventDTO 변환된 상품 DTO
-     *
+     * <p>
      * 동작 방식:
      * - 상품 엔티티를 DTO로 변환합니다.
      * - 관련된 이벤트 목록을 이벤트 DTO로 변환하여 포함합니다.
@@ -116,7 +114,7 @@ public class ProductServiceImpl implements ProductService {
      *
      * @param eventProduct 변환할 EventProduct 엔티티
      * @return EventInfoDTO 변환된 이벤트 DTO
-     *
+     * <p>
      * 동작 방식:
      * - 이벤트와 상품 데이터를 사용하여 할인 가격과 차이를 계산합니다.
      * - 이벤트 정보를 DTO로 변환하여 반환합니다.
