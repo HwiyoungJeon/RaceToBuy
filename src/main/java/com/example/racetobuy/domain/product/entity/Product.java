@@ -1,6 +1,8 @@
 package com.example.racetobuy.domain.product.entity;
 
 import com.example.racetobuy.domain.timestamp.TimeStamp;
+import com.example.racetobuy.global.constant.ErrorCode;
+import com.example.racetobuy.global.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -35,5 +37,19 @@ public class Product extends TimeStamp {
 
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<EventProduct> eventProducts = new ArrayList<>();
+
+    public void updateStockQuantity(int quantity) {
+        if (quantity < 0) {
+            throw new BusinessException(ErrorCode.INVALID_QUANTITY);
+        }
+        this.stockQuantity = quantity;
+    }
+
+    public void reduceStock(int amount) {
+        if (this.stockQuantity < amount) {
+            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+        }
+        this.stockQuantity -= amount;
+    }
 
 }
