@@ -1,9 +1,11 @@
-package com.example.racetobuy.domain.order;
+package com.example.racetobuy.domain.order.entity;
 
+import com.example.racetobuy.domain.product.entity.EventProduct;
 import com.example.racetobuy.domain.product.entity.Product;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -34,4 +36,24 @@ public class OrderDetail extends TimeStamp {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id")
+    private EventProduct eventProduct; // 사용된 이벤트 정보
+
+    @Column(name = "discount_price", nullable = false)
+    private BigDecimal discountPrice; // 할인 적용 후 금액
+
+    @Builder
+    public OrderDetail(Order order,Product product, Integer quantity, BigDecimal price,EventProduct eventProduct,BigDecimal discountPrice) {
+        this.order = order;
+        this.product = product;
+        this.quantity = quantity;
+        this.price = price;
+        this.eventProduct = eventProduct;
+        this.discountPrice = discountPrice;
+    }
+
+    public void assignOrder(Order order) {
+        this.order = order;
+    }
 }

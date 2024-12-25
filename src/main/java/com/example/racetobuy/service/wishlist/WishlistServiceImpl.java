@@ -134,8 +134,9 @@ public class WishlistServiceImpl implements WishlistService {
                 .collect(Collectors.toList());
 
         // 다음 커서 계산
+        boolean hasMore = wishlists.size() > startIndex + size;
 
-        return new PagedResponseDTO<>(cursor, size, wishlistDtos);
+        return new PagedResponseDTO<>(cursor, size, wishlistDtos,hasMore);
     }
 
     @Override
