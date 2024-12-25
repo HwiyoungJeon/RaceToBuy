@@ -60,8 +60,9 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
 
         // 다음 커서 계산
+        boolean hasMore = products.size() > startIndex + size;
 
-        return new PagedResponseDTO<>(cursor, size, productDtos);
+        return new PagedResponseDTO<>(cursor, size, productDtos,hasMore);
     }
 
     /**

@@ -1,6 +1,6 @@
 package com.example.racetobuy.domain.member.entity;
 
-import com.example.racetobuy.domain.order.Order;
+import com.example.racetobuy.domain.order.entity.Order;
 import com.example.racetobuy.domain.timestamp.TimeStamp;
 import com.example.racetobuy.domain.wishlist.entity.Wishlist;
 import com.example.racetobuy.global.constant.RoleToken;

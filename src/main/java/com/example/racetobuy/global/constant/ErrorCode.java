@@ -47,6 +47,21 @@ public enum ErrorCode {
     STOCK_NOT_ENOUGH(HttpStatus.BAD_REQUEST, "상품의 재고가 부족합니다."),
     INVALID_QUANTITY(HttpStatus.BAD_REQUEST, "수량은 0보다 커야 합니다."),
 
+    //주문 관련 에러
+    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "이벤트 정보를 찾을 수 없습니다."),
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문 정보를 찾을 수 없습니다."),
+    ORDER_CANCELLATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "주문 상태가 배송중이 되기 이전까지만 취소가 가능합니다."),
+    RETURN_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "배송 완료 후 D+1일까지만 반품이 가능합니다."),
+    INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "유효하지 않은 주문 상태입니다."),
+    INVALID_ORDER_STATUS_DESCRIPTION(HttpStatus.BAD_REQUEST, "유효하지 않은 주문 상태 DESCRIPTION 입니다."),
+    INVALID_TOTAL_PRICE(HttpStatus.BAD_REQUEST, "총 금액은 0보다 작을 수 없습니다."),
+    ORDER_CANCELLATION_PERIOD_EXPIRED(HttpStatus.BAD_REQUEST, "취소는 주문 상태가 배송중이 되기 이전까지만 가능합니다."),
+    RETURN_NOT_ALLOWED_NOT_DELIVERED(HttpStatus.BAD_REQUEST, "반품은 배송 완료 상태이거나 배송 완료 후 D+1일까지만 반품이 가능합니다."),
+    RETURN_PERIOD_EXPIRED(HttpStatus.BAD_REQUEST, "반품 요청 가능 기간이 지났습니다."),
+    RETURN_NOT_ALLOWED_NOT_REQUESTED(HttpStatus.BAD_REQUEST, "반품 요청 상태에서만 반품 완료가 가능합니다."),
+    ORDER_CANNOT_UPDATE_CANCELLED(HttpStatus.BAD_REQUEST, "취소된 주문은 상태를 변경할 수 없습니다."),
+    EVENT_NOT_LINKED_TO_PRODUCT(HttpStatus.BAD_REQUEST, "해당 상품에 대한 이벤트가 존재하지 않습니다."),
+    EVENT_SERVICE_EXPIRED(HttpStatus.BAD_REQUEST, "이벤트의 서비스 기간이 지났습니다."),
     ;
 
 

@@ -61,6 +61,10 @@ dependencies {
     // 레디스
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    //주문
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.1' // Jackson 버전에 맞는 최신 버전 사용
+
+
 }
 
 tasks.named('test') {

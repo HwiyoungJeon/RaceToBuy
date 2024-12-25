@@ -52,7 +52,7 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 🔥 RefreshToken 생성 메서드
+     * RefreshToken 생성 메서드
      */
     public String createRefreshToken(Member member, String role) {
         Claims claims = Jwts.claims();
@@ -96,7 +96,7 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token.replace(TOKEN_PREFIX, ""))
                 .getBody();
 
-        // 🔥 JWT Claims에서 "id"를 Long 타입으로 가져옴
+        // JWT Claims에서 "id"를 Long 타입으로 가져옴
         return claims.get("id", Long.class);
     }
 
