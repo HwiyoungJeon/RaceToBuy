@@ -1,0 +1,95 @@
+## application-local.yml / product.yml
+spring:
+  config:
+    activate:
+      on-profile: local  # 이 파일이 local 프로파일용임을 명시
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/racetobuy}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:1234}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect  # 권장되는 Dialect로 변경
+  mail:
+    host: smtp.mailtrap.io
+    port: 2525
+    username: ${email}
+    password: ${email_password} # Mailtrap에서 제공하는 비밀번호
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  application:
+   name: product-service
+   mvc:
+     pathmatch:
+       matching-strategy: ant_path_matcher
+     log-request-details: true
+     throw-exception-if-no-handler-found: true
+
+server:
+  port: 9001  # 로컬 환경에서 사용할 포트 (Docker와 충돌 방지)
+  servlet:
+    context-path: /
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    lease-renewal-interval-in-seconds: ${EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS:10}
+    lease-expiration-duration-in-seconds: ${EUREKA_INSTANCE_LEASE_EXPIRATION_DURATION_IN_SECONDS:30}
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    non-secure-port-enabled: true
+    metadata-map:
+      instanceId: ${spring.application.name}:${random.value}
+#  instance:
+#    lease-renewal-interval-in-seconds: 10
+#    lease-expiration-duration-in-seconds: 30
+#    prefer-ip-address: true
+#    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+#    non-secure-port-enabled: true
+#    metadata-map:
+#      instanceId: ${spring.application.name}:${random.value}
+
+mvc:
+  cors:
+    mappings:
+      "/api/**":
+        allowed-origins:
+          - "http://localhost:8000"
+          - "http://localhost:9001"
+        allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+        allowed-headers: "*"
+        allow-credentials: true
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+
+logging:
+  level:
+    org.springframework.web: TRACE
+    com.jh.productservice: DEBUG
+    root: INFO
+
+jwt:
+  secret:
+    key: ${JWT_SECRET_KEY:7Leo7JeF7L2U7Iqk7ZmU7J207YyF7ZW064u56rWQ7Jyh6rO87KCV7J2E64Gd64K06rOg64KY66m06ryt7Leo7JeF7ZWY7Iuk7IiY7J6I7J2E6rKB64uI64ukLg==}

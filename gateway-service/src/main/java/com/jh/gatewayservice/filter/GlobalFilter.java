@@ -2,103 +2,125 @@ package com.jh.gatewayservice.filter;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-
 import java.util.Base64;
-import java.util.Optional;
-
-import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR;
+import javax.crypto.SecretKey;
 
 @Component
 @Slf4j
 public class GlobalFilter extends AbstractGatewayFilterFactory<GlobalFilter.Config> {
 
+    private static final String FILTER_NAME = "GlobalFilter";
+
     @Value("${jwt.secret.key}")
-    private String jwtSecret;
+    private String secretKey;
 
     public GlobalFilter() {
         super(Config.class);
     }
 
     @Override
+    public String name() {
+        return FILTER_NAME;
+    }
+
+    @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
-            String path = request.getURI().getPath();
+            String path = request.getPath().value();
 
-            log.info("Processing request path: {}", path);
-            log.info("Request URI: {}", request.getURI());
-            log.info("Request method: {}", request.getMethod());
-            log.info("Request headers: {}", request.getHeaders());
-            log.info("Gateway route destination: {}",
-                    Optional.ofNullable(exchange.getAttribute(GATEWAY_REQUEST_URL_ATTR)));
-            log.info("JWT Secret Key: {}", jwtSecret);
+            log.debug("Processing request: {} {}", request.getMethod(), path);
+            log.debug("Request headers: {}", request.getHeaders());
 
             if (isPublicPath(path)) {
-                log.info("Public path accessed: {}", path);
                 return chain.filter(exchange);
             }
 
-            String token = request.getHeaders().getFirst("Authorization");
-            log.info("Authorization header value: '{}'", token);
-
-            if (token == null) {
-                log.error("Token is null");
-                return onError(exchange, "Token is missing", HttpStatus.UNAUTHORIZED);
+            String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return handleError(exchange, "No valid authorization header", HttpStatus.UNAUTHORIZED);
             }
 
-            if (!token.startsWith("Bearer ")) {
-                log.error("Token does not start with 'Bearer ': {}", token);
-                return onError(exchange, "Invalid token format", HttpStatus.UNAUTHORIZED);
-            }
-
+            String token = authHeader.substring(7);
             try {
-                String actualToken = token.substring(7);
-                log.info("Token after removing 'Bearer ': '{}'", actualToken);
+                Claims claims = validateToken(token);
 
-                Claims claims = Jwts.parser()
-                        .setSigningKey(Base64.getDecoder().decode(jwtSecret))
-                        .parseClaimsJws(actualToken)
-                        .getBody();
+                ServerHttpRequest modifiedRequest = exchange.getRequest().mutate()
+                    .header("X-Authorization-Id", claims.get("id").toString())
+                    .header("X-Authorization-Role", claims.get("role").toString())
+                    .header(HttpHeaders.AUTHORIZATION, authHeader)
+                    .build();
 
-                log.info("Successfully parsed token. Claims: {}", claims);
-
-                ServerHttpRequest modifiedRequest = request.mutate()
-                        .header("X-Authorization-Id", String.valueOf(claims.get("id")))
-                        .header("X-Authorization-Email", String.valueOf(claims.get("email")))
-                        .header("X-Authorization-Role", String.valueOf(claims.get("role")))
-                        .build();
+                log.debug("Modified request headers: {}", modifiedRequest.getHeaders());
 
                 return chain.filter(exchange.mutate().request(modifiedRequest).build());
             } catch (Exception e) {
-                log.error("Token validation failed: {}", e.getMessage(), e);
-                return onError(exchange, "Invalid token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
+                log.error("Token validation failed", e);
+                return handleError(exchange, "Invalid token", HttpStatus.UNAUTHORIZED);
             }
         };
     }
 
     private boolean isPublicPath(String path) {
-        return path.startsWith("/auth/") ||
-                path.startsWith("/login") ||
-                path.startsWith("/signup");
+        boolean isPublic = path.startsWith("/auth/") ||
+                          path.startsWith("/login") ||
+                          path.startsWith("/signup") ||
+                          path.startsWith("/actuator/");
+        log.debug("Path {} is public: {}", path, isPublic);
+        return isPublic;
     }
 
-    private Mono<Void> onError(ServerWebExchange exchange, String message, HttpStatus status) {
-        log.error("Error during request processing: {}", message);
+    private String extractToken(ServerHttpRequest request) {
+        String authHeader = request.getHeaders().getFirst("Authorization");
+        log.debug("Authorization header: {}", authHeader);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    private Claims validateToken(String token) {
+        try {
+            // Base64로 디코딩된 시크릿 키 사용
+            byte[] keyBytes = Base64.getDecoder().decode(secretKey);
+            SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+
+            return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        } catch (Exception e) {
+            log.error("Token validation error: {}", e.getMessage());
+            log.debug("Secret key being used: {}", secretKey);
+            log.debug("Token being validated: {}", token);
+            throw e;
+        }
+    }
+
+    private Mono<Void> handleError(ServerWebExchange exchange, String message, HttpStatus status) {
+        log.debug("Handling error: {} with status: {}", message, status);
         exchange.getResponse().setStatusCode(status);
         return exchange.getResponse().setComplete();
     }
 
     @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Config {
         private String baseMessage;
         private boolean preLogger;

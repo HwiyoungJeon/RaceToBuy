@@ -4,7 +4,7 @@ import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
 import com.jh.orderservice.domain.order.dto.OrderRequestDTO;
 import com.jh.orderservice.service.OrderService;
-import com.jh.userservice.security.MemberDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,13 +28,25 @@ public class OrderController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<?>> getOrders(
-//        @RequestHeader("Authorization-Id") Long memberId,
+            HttpServletRequest request,
             @RequestParam(required = false, defaultValue = "0") Long cursor,
             @RequestParam(defaultValue = "10") int size) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
+        // 헤더에서 id와 role 값을 읽어옴
+        String id = request.getHeader("X-Authorization-Id");
+//        String role = request.getHeader("X-Authorization-Role");
+        Long memberId = null;
+        try {
+            assert id != null;
+            memberId = Long.parseLong(id); // id 값을 Long으로 변환
+        } catch (NumberFormatException e) {
+            System.out.println("에러 : ㅠ");
+        }
 
-        ApiResponse<?> response = orderService.getOrdersByMemberId(memberDetails.getMemberId(), cursor, size);
+        System.out.println("memberId: " + memberId); // 디버깅을 위한 로그
+
+        // memberId를 사용하여 주문 조회 서비스 호출
+        ApiResponse<?> response = orderService.getOrdersByMemberId(memberId, cursor, size);
+
         return ResponseEntity.ok(response);
     }
 
@@ -49,8 +61,8 @@ public class OrderController {
     public ResponseEntity<ApiResponse<?>> getOrderDetails(
             @PathVariable Long orderId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        ApiResponse<?> response = orderService.getOrderDetailsById(orderId, memberDetails.getMemberId());
+        Long memberId = (Long) auth.getPrincipal();
+        ApiResponse<?> response = orderService.getOrderDetailsById(orderId, memberId);
         return ResponseEntity.ok(response);
     }
 
@@ -61,16 +73,16 @@ public class OrderController {
      * @return ApiResponse  주문 생성 결과
      */
     @PostMapping
-    public ApiResponse<?> createOrder(@RequestBody List<OrderRequestDTO> orderRequest) {
+    public ApiResponse<?> createOrder(
+            @RequestBody List<OrderRequestDTO> orderRequest) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-
+            Long memberId = (Long) auth.getPrincipal();
             // 디버깅을 위한 로그 추가
-            System.out.println("회원 ID: " + memberDetails.getMemberId());
+            System.out.println("회원 ID: " + memberId);
             System.out.println("주문 요청 데이터: " + orderRequest);
 
-            ApiResponse<?> response = orderService.createOrder(memberDetails.getMemberId(), orderRequest);
+            ApiResponse<?> response = orderService.createOrder(memberId, orderRequest);
 
             // 디버깅을 위한 반환 값 확인
             System.out.println("주문 생성 응답: " + response);
@@ -93,8 +105,8 @@ public class OrderController {
     @PostMapping("/{orderId}/cancel")
     public ApiResponse<?> cancelOrder(@PathVariable Long orderId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        return orderService.cancelOrder(memberDetails.getMemberId(), orderId);
+        Long memberId = (Long) auth.getPrincipal();
+        return orderService.cancelOrder(memberId, orderId);
     }
 
     /**
@@ -107,8 +119,8 @@ public class OrderController {
     @PostMapping("/{orderId}/return")
     public ApiResponse<?> returnOrder(@PathVariable Long orderId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        return orderService.returnOrder(memberDetails.getMemberId(), orderId);
+        Long memberId = (Long) auth.getPrincipal();
+        return orderService.returnOrder(memberId, orderId);
     }
 
     /**

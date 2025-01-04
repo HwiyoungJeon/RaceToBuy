@@ -6,8 +6,8 @@ import com.jh.common.exception.BusinessException;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.entity.Order;
 import com.jh.orderservice.domain.order.repository.OrderRepository;
-import com.jh.productservice.domain.product.entity.Product;
-import com.jh.productservice.domain.product.repository.ProductRepository;
+import com.jh.orderservice.client.ProductServiceClient;
+import com.jh.orderservice.client.dto.StockUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class OrderStatusAspect {
 
     private final OrderRepository orderRepository;
-    private final ProductRepository productRepository; // 상품 정보 업데이트를 위해 추가
+    private final ProductServiceClient productClient;
 
     @AfterReturning(pointcut = "execution(* com.jh.orderservice.service.OrderServiceImpl.updateOrderStatus(..)) || execution(* com.jh.orderservice.service.OrderServiceImpl.returnOrder(..))", returning = "result")
     public void updateOrderStatusAfterProcessing(Object result) {
@@ -71,13 +71,10 @@ public class OrderStatusAspect {
      */
     private void restoreStockForReturnedOrder(Order order) {
         order.getOrderDetails().forEach(detail -> {
-            // productId로 Product 데이터 조회
-            Product product = productRepository.findById(detail.getProductId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-
-            // 재고 복구
-            product.updateStockQuantity(product.getStockQuantity() + detail.getQuantity());
-            productRepository.save(product); // 상품 정보 저장
+            productClient.increaseStock(new StockUpdateRequest(
+                detail.getProductId(),
+                detail.getQuantity()
+            ));
         });
     }
 

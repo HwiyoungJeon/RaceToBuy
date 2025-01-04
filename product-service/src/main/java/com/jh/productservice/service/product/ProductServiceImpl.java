@@ -9,10 +9,12 @@ import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
 import com.jh.productservice.domain.product.entity.Event;
 import com.jh.productservice.domain.product.entity.EventProduct;
 import com.jh.productservice.domain.product.entity.Product;
+import com.jh.productservice.domain.product.repository.EventProductRepository;
 import com.jh.productservice.domain.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,9 +22,11 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final EventProductRepository eventProductRepository;
 
     /**
      * 커서 기반 페이지네이션을 사용하여 상품 목록을 조회합니다.
@@ -136,5 +140,44 @@ public class ProductServiceImpl implements ProductService {
                 discountPrice,
                 priceDifference
         );
+    }
+
+    @Override
+    public boolean checkStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        return product.getStockQuantity() >= quantity;
+    }
+
+    @Override
+    @Transactional
+    public void decreaseStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        
+        if (product.getStockQuantity() < quantity) {
+            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+        }
+        
+        product.reduceStock(quantity);
+        productRepository.save(product);
+    }
+
+    @Override
+    @Transactional
+    public void increaseStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        
+        product.updateStockQuantity(product.getStockQuantity() + quantity);
+        productRepository.save(product);
+    }
+
+    @Override
+    public EventInfoDTO getEventInfo(Long eventId, Long productId) {
+        EventProduct eventProduct = eventProductRepository.findByEvent_EventIdAndProduct_ProductId(eventId, productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
+        
+        return mapEventProductToEventInfoDto(eventProduct);
     }
 }

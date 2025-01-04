@@ -1,6 +1,7 @@
 package com.jh.orderservice.service;
 
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jh.common.constant.ErrorCode;
 import com.jh.common.constant.OrderStatus;
 import com.jh.common.domain.page.PagedResponseDTO;
@@ -8,6 +9,10 @@ import com.jh.common.exception.BusinessException;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.client.MemberClient;
 import com.jh.orderservice.client.MemberResponse;
+import com.jh.orderservice.client.ProductServiceClient;
+import com.jh.orderservice.client.dto.EventInfoDTO;
+import com.jh.orderservice.client.dto.ProductResponse;
+import com.jh.orderservice.client.dto.StockUpdateRequest;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
 import com.jh.orderservice.domain.order.dto.OrderDetailsResponseDTO;
 import com.jh.orderservice.domain.order.dto.OrderRequestDTO;
@@ -16,13 +21,9 @@ import com.jh.orderservice.domain.order.entity.Order;
 import com.jh.orderservice.domain.order.entity.OrderDetail;
 import com.jh.orderservice.domain.order.repository.OrderDetailRepository;
 import com.jh.orderservice.domain.order.repository.OrderRepository;
-import com.jh.productservice.domain.product.entity.EventProduct;
-import com.jh.productservice.domain.product.entity.Product;
-import com.jh.productservice.domain.product.repository.EventProductRepository;
-import com.jh.productservice.domain.product.repository.ProductRepository;
-import com.jh.userservice.domain.repository.MemberRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,40 +34,112 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderDetailRepository orderDetailRepository;
-    private final ProductRepository productRepository;
     private final MemberClient memberClient;
-    private final EventProductRepository eventProductRepository;
+    private final ProductServiceClient productClient;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
     public ApiResponse<?> createOrder(Long memberId, List<OrderRequestDTO> orderRequests) {
         MemberResponse member = findMemberById(memberId);
-
         Order order = createAndSaveOrder(member);
 
-        BigDecimal totalPrice = processOrderDetails(order, orderRequests);
-
-        order.updateTotalPrice(totalPrice);
+        processOrderDetails(order, orderRequests);
 
         return ApiResponse.success("주문이 성공적으로 생성되었습니다.");
     }
 
+    private void processOrderDetails(Order order, List<OrderRequestDTO> orderRequests) {
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (OrderRequestDTO request : orderRequests) {
+            // 상품 정보 조회
+            ProductResponse product = findProductById(request.getProductId());
+
+            // 재고 확인
+            try {
+                ApiResponse<Boolean> stockCheckResponse =
+                        productClient.checkStock(product.getProductId(), request.getQuantity());
+                if (!Boolean.TRUE.equals(stockCheckResponse.getData())) {
+                    throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+                }
+            } catch (FeignException e) {
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
+            // 이벤트 적보 조회 및 가격 계산
+            BigDecimal finalPrice;
+            if (request.getEventId() != null) {
+                try {
+                    EventInfoDTO eventInfo = productClient.getEventInfo(request.getEventId(), product.getProductId()).getData();
+                    finalPrice = eventInfo.getDiscountPrice();
+                } catch (FeignException e) {
+                    throw new BusinessException(ErrorCode.EVENT_NOT_FOUND);
+                }
+            } else {
+                finalPrice = product.getPrice();
+            }
+
+            // 주문 상세 생성
+            OrderDetail orderDetail = OrderDetail.builder()
+                    .order(order)
+                    .productId(product.getProductId())
+                    .productName(product.getProductName())
+                    .quantity(request.getQuantity())
+                    .price(finalPrice.multiply(BigDecimal.valueOf(request.getQuantity())))
+//                    .productSnapshot(createProductSnapshot(product))
+                    .build();
+
+            order.addOrderDetail(orderDetail);
+            orderDetailRepository.save(orderDetail);
+
+            // 재고 감소 요청
+            productClient.decreaseStock(new StockUpdateRequest(
+                    product.getProductId(),
+                    request.getQuantity()
+            ));
+
+            totalPrice = totalPrice.add(finalPrice.multiply(BigDecimal.valueOf(request.getQuantity())));
+        }
+
+        order.updateTotalPrice(totalPrice);
+    }
+
+    private String createProductSnapshot(ProductResponse product) {
+        try {
+            return objectMapper.writeValueAsString(product);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private ProductResponse getProductFromSnapshot(String snapshot) {
+        try {
+            return objectMapper.readValue(snapshot, ProductResponse.class);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     @Override
     @Transactional
     public ApiResponse<?> cancelOrder(Long memberId, Long orderId) {
         Order order = findOrderByIdAndMemberId(orderId, memberId);
-
         validateOrderStatusForCancellation(order);
 
-        restoreStock(order);
+        // 재고 복구 요청
+        order.getOrderDetails().forEach(detail -> {
+            productClient.increaseStock(new StockUpdateRequest(
+                    detail.getProductId(),
+                    detail.getQuantity()
+            ));
+        });
 
         order.cancelOrder();
-
         return ApiResponse.success("주문이 성공적으로 취소되었습니다.");
     }
 
@@ -112,9 +185,8 @@ public class OrderServiceImpl implements OrderService {
 
     public MemberResponse findMemberById(Long memberId) {
         try {
-            // memberId만으로 조회 (토큰 불필요)
             ApiResponse<MemberResponse> response = memberClient.getMemberById(memberId);
-            return response.getData();
+            return response.getData();  // ApiResponse에서 실제 데이터 추출
         } catch (FeignException.NotFound e) {
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
@@ -136,101 +208,12 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.save(order);
     }
 
-    private BigDecimal processOrderDetails(Order order, List<OrderRequestDTO> orderRequests) {
-        BigDecimal totalPrice = BigDecimal.ZERO;
-
-        for (OrderRequestDTO request : orderRequests) {
-            System.out.println("Processing order getQuantity: " + request.getQuantity());
-            System.out.println("Processing order getEventId: " + request.getEventId());
-            System.out.println("Processing order getProductId: " + request.getProductId());
-            Product product = findProductById(request.getProductId());
-
-            validateStock(product, request.getQuantity());
-
-            EventProduct appliedEvent = findEventProductIfApplicable(request.getEventId(), product);
-
-            BigDecimal discountedPrice = calculateDiscountedPrice(product, appliedEvent);
-
-            product.reduceStock(request.getQuantity());
-
-            saveOrderDetail(order, product, request.getQuantity(), discountedPrice, appliedEvent);
-
-            totalPrice = totalPrice.add(discountedPrice.multiply(BigDecimal.valueOf(request.getQuantity())));
-        }
-
-        return totalPrice;
-    }
-
-    private Product findProductById(Long productId) {
-        return productRepository.findById(productId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-    }
-
-    private void validateStock(Product product, int quantity) {
-        if (product.getStockQuantity() < quantity) {
-            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
-        }
-    }
-
-    private EventProduct findEventProductIfApplicable(Long eventId, Product product) {
-        if (eventId == null) return null;
-
-        // 이벤트 조회
-        EventProduct eventProduct = eventProductRepository.findByEvent_EventIdAndProduct_ProductId(eventId, product.getProductId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
-
-        // 이벤트와 상품 연결 여부 검증
-        if (!eventProduct.getProduct().equals(product)) {
-            throw new BusinessException(ErrorCode.EVENT_NOT_LINKED_TO_PRODUCT);
-        }
-        return eventProduct;
-    }
-
-    private BigDecimal calculateDiscountedPrice(Product product, EventProduct appliedEvent) {
-        if (appliedEvent == null) return product.getPrice();
-
-        BigDecimal discountRate = BigDecimal.valueOf(appliedEvent.getDiscountRate())
-                .divide(BigDecimal.valueOf(100));
-
-        return product.getPrice().multiply(BigDecimal.ONE.subtract(discountRate));
-    }
-
-    private void saveOrderDetail(Order order, Product product, int quantity, BigDecimal discountedPrice, EventProduct appliedEvent) {
-        BigDecimal finalDiscountedPrice = discountedPrice != null ? discountedPrice : product.getPrice();
-
-        Long eventProductId = null;
-        String eventProductName = null;
-        if (appliedEvent != null) {
-            eventProductId = appliedEvent.getId(); // 이벤트가 있을 경우 ID를 가져옵니다.
-            eventProductName = appliedEvent.getEvent().getEventName();
-        }
-
-        OrderDetail orderDetail = OrderDetail.builder()
-                .order(order)
-                .productId(product.getProductId())
-                .productName(product.getProductName())
-                .quantity(quantity)
-                .price(finalDiscountedPrice.multiply(BigDecimal.valueOf(quantity)))
-                .eventProductId(eventProductId)
-                .eventProductName(eventProductName)
-                .discountPrice(finalDiscountedPrice)
-                .build();
-
-        order.addOrderDetail(orderDetail);
-        orderDetailRepository.save(orderDetail);
-    }
-
     private void restoreStock(Order order) {
         order.getOrderDetails().forEach(detail -> {
-            // productId를 사용하여 Product 데이터 조회
-            Product product = productRepository.findById(detail.getProductId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-
-            // 재고 복구
-            product.updateStockQuantity(product.getStockQuantity() + detail.getQuantity());
-
-            // 변경된 Product 저장
-            productRepository.save(product);
+            productClient.increaseStock(new StockUpdateRequest(
+                    detail.getProductId(),
+                    detail.getQuantity()
+            ));
         });
     }
 
@@ -324,5 +307,17 @@ public class OrderServiceImpl implements OrderService {
         OrderDetailsResponseDTO orderDetailsResponse = OrderDetailsResponseDTO.fromEntity(order);
 
         return ApiResponse.success(orderDetailsResponse);
+    }
+
+    private ProductResponse findProductById(Long productId) {
+        try {
+            ApiResponse<ProductResponse> response = productClient.getProduct(productId);
+            if (response.getData() == null) {
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
+            return response.getData();
+        } catch (FeignException e) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
     }
 }
