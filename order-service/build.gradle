@@ -35,6 +35,8 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
 
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 }
 
 dependencyManagement {

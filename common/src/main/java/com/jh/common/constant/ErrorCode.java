@@ -63,6 +63,7 @@ public enum ErrorCode {
     ORDER_CANNOT_UPDATE_CANCELLED(HttpStatus.BAD_REQUEST, "취소된 주문은 상태를 변경할 수 없습니다."),
     EVENT_NOT_LINKED_TO_PRODUCT(HttpStatus.BAD_REQUEST, "해당 상품에 대한 이벤트가 존재하지 않습니다."),
     EVENT_SERVICE_EXPIRED(HttpStatus.BAD_REQUEST, "이벤트의 서비스 기간이 지났습니다."),
+    STOCK_DECREASE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "재고 감소 처리에 실패했습니다."),
     ;
 
 

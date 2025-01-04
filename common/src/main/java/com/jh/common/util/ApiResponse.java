@@ -60,6 +60,15 @@ public class ApiResponse<T> {
         return new ApiResponse<>(errorCode.getStatusCode(), errorCode.getMessage(), null);
     }
 
+    public static <T> ApiResponse<T> error(ErrorCode errorCode) {
+        return new ApiResponse<>(errorCode.getStatusCode(), errorCode.getMessage(), null);
+    }
+
+    public static <T> ApiResponse<T> fail(int code, String message) {
+        return new ApiResponse<>(code, message, null);
+    }
+
+
     /**
      * 🔥 addData 메서드 (data를 Map으로 확장하여 추가 데이터 삽입)
      *

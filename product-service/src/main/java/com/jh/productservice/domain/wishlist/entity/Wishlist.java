@@ -2,7 +2,6 @@ package com.jh.productservice.domain.wishlist.entity;
 
 import com.jh.common.domain.timestamp.TimeStamp;
 import com.jh.productservice.domain.product.entity.Product;
-import com.jh.userservice.domain.entity.Member;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -20,9 +19,8 @@ public class Wishlist extends TimeStamp {
     @Column(name = "wishlist_id")
     private Long wishlistId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
-    private Member member;
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
@@ -31,14 +29,14 @@ public class Wishlist extends TimeStamp {
     /**
      * 위시리스트 생성 메서드
      *
-     * @param member  위시리스트 소유 회원
+     * @param memberId 위시리스트 소유 회원 ID
      * @param product 위시리스트에 등록할 상품
      * @return Wishlist 객체
      */
     @Builder
-    public static Wishlist createWishlist(Member member, Product product) {
+    public static Wishlist createWishlist(Long memberId, Product product) {
         Wishlist wishlist = new Wishlist();
-        wishlist.member = member;
+        wishlist.memberId = memberId;
         wishlist.product = product;
         return wishlist;
     }

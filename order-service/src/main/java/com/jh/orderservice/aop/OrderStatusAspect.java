@@ -9,6 +9,7 @@ import com.jh.orderservice.domain.order.repository.OrderRepository;
 import com.jh.orderservice.client.ProductServiceClient;
 import com.jh.orderservice.client.dto.StockUpdateRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
@@ -16,10 +17,46 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class OrderStatusAspect {
 
     private final OrderRepository orderRepository;
     private final ProductServiceClient productClient;
+
+    @AfterReturning(
+        pointcut = "execution(* com.jh.orderservice.service.OrderServiceImpl.createOrder(..))",
+        returning = "result"
+    )
+    public void decreaseStockAfterOrderCreation(Object result) {
+        Long orderId = extractOrderIdFromResult(result);
+        if (orderId == null) {
+            log.warn("주문 ID를 찾을 수 없습니다.");
+            return;
+        }
+
+        Order order = orderRepository.findById(orderId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        try {
+            order.getOrderDetails().forEach(detail -> {
+                ApiResponse<Boolean> response = productClient.decreaseStock(
+                    StockUpdateRequest.builder()
+                        .productId(detail.getProductId())
+                        .quantity(detail.getQuantity())
+                        .build()
+                );
+
+                if (response == null || !Boolean.TRUE.equals(response.getData())) {
+                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+                }
+            });
+        } catch (Exception e) {
+            log.error("재고 감소 실패: {}", e.getMessage());
+            order.updateOrderStatus(OrderStatus.FAILED);
+            orderRepository.save(order);
+            throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+        }
+    }
 
     @AfterReturning(pointcut = "execution(* com.jh.orderservice.service.OrderServiceImpl.updateOrderStatus(..)) || execution(* com.jh.orderservice.service.OrderServiceImpl.returnOrder(..))", returning = "result")
     public void updateOrderStatusAfterProcessing(Object result) {

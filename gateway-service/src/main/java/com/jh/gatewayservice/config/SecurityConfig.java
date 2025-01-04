@@ -25,10 +25,7 @@ public class SecurityConfig {
                 .pathMatchers(
                     "/auth/**", 
                     "/login/**", 
-                    "/signup/**", 
-                    "/orders/**",          // 임시로 추가
-                    "/products/**",        // 임시로 추가
-                    "/users/**"           // 임시로 추가
+                    "/signup/**"
                 ).permitAll()
                 .anyExchange().permitAll()  // 테스트를 위해 모든 요청 허용
             )

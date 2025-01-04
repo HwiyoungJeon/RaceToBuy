@@ -3,38 +3,48 @@ package com.jh.gatewayservice.filter;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import java.util.Base64;
+
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.List;
+import java.util.Arrays;
 
 @Component
 @Slf4j
 public class GlobalFilter extends AbstractGatewayFilterFactory<GlobalFilter.Config> {
 
-    private static final String FILTER_NAME = "GlobalFilter";
-
     @Value("${jwt.secret.key}")
     private String secretKey;
+
+    private final List<String> publicPaths = Arrays.asList(
+        "/user-service/**"
+    );
 
     public GlobalFilter() {
         super(Config.class);
     }
 
-    @Override
-    public String name() {
-        return FILTER_NAME;
+    @Getter
+    @Setter
+    public static class Config {
+        private String baseMessage;
+        private boolean preLogger;
+        private boolean postLogger;
     }
 
     @Override
@@ -42,60 +52,52 @@ public class GlobalFilter extends AbstractGatewayFilterFactory<GlobalFilter.Conf
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getPath().value();
-
+            
             log.debug("Processing request: {} {}", request.getMethod(), path);
             log.debug("Request headers: {}", request.getHeaders());
-
+            
             if (isPublicPath(path)) {
                 return chain.filter(exchange);
             }
 
             String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return handleError(exchange, "No valid authorization header", HttpStatus.UNAUTHORIZED);
+                return onError(exchange, "No valid authorization header", HttpStatus.UNAUTHORIZED);
             }
 
             String token = authHeader.substring(7);
             try {
                 Claims claims = validateToken(token);
+                log.debug("Token validated successfully. Claims: {}", claims);
 
+                // 토큰에서 사용자 정보 추출
+                String userId = claims.get("id").toString();
+                String role = claims.get("role").toString();
+
+                // order-service로 요청을 전달할 때 필요한 헤더 추가
                 ServerHttpRequest modifiedRequest = exchange.getRequest().mutate()
-                    .header("X-Authorization-Id", claims.get("id").toString())
-                    .header("X-Authorization-Role", claims.get("role").toString())
-                    .header(HttpHeaders.AUTHORIZATION, authHeader)
+                    .header("X-Authorization-Id", userId)
+                    .header("X-Authorization-Role", role)
                     .build();
 
-                log.debug("Modified request headers: {}", modifiedRequest.getHeaders());
+                return chain.filter(exchange.mutate().request(modifiedRequest).build())
+                    .then(Mono.fromRunnable(() -> {
+                        log.debug("Post filter executed");
+                    }));
 
-                return chain.filter(exchange.mutate().request(modifiedRequest).build());
             } catch (Exception e) {
                 log.error("Token validation failed", e);
-                return handleError(exchange, "Invalid token", HttpStatus.UNAUTHORIZED);
+                return onError(exchange, "Invalid token", HttpStatus.UNAUTHORIZED);
             }
         };
     }
 
     private boolean isPublicPath(String path) {
-        boolean isPublic = path.startsWith("/auth/") ||
-                          path.startsWith("/login") ||
-                          path.startsWith("/signup") ||
-                          path.startsWith("/actuator/");
-        log.debug("Path {} is public: {}", path, isPublic);
-        return isPublic;
-    }
-
-    private String extractToken(ServerHttpRequest request) {
-        String authHeader = request.getHeaders().getFirst("Authorization");
-        log.debug("Authorization header: {}", authHeader);
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
-        }
-        return null;
+        return publicPaths.stream().anyMatch(path::startsWith);
     }
 
     private Claims validateToken(String token) {
         try {
-            // Base64로 디코딩된 시크릿 키 사용
             byte[] keyBytes = Base64.getDecoder().decode(secretKey);
             SecretKey key = Keys.hmacShaKeyFor(keyBytes);
 
@@ -112,18 +114,14 @@ public class GlobalFilter extends AbstractGatewayFilterFactory<GlobalFilter.Conf
         }
     }
 
-    private Mono<Void> handleError(ServerWebExchange exchange, String message, HttpStatus status) {
-        log.debug("Handling error: {} with status: {}", message, status);
-        exchange.getResponse().setStatusCode(status);
-        return exchange.getResponse().setComplete();
-    }
+    private Mono<Void> onError(org.springframework.web.server.ServerWebExchange exchange, String message, HttpStatus status) {
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(status);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Config {
-        private String baseMessage;
-        private boolean preLogger;
-        private boolean postLogger;
+        String errorMessage = String.format("{\"error\": \"%s\"}", message);
+        DataBuffer buffer = response.bufferFactory().wrap(errorMessage.getBytes(StandardCharsets.UTF_8));
+        
+        return response.writeWith(Mono.just(buffer));
     }
 }

@@ -1,7 +1,6 @@
 package com.jh.productservice.service.wishlist;
 
 
-
 import com.jh.common.constant.ErrorCode;
 import com.jh.common.domain.page.PagedResponseDTO;
 import com.jh.common.exception.BusinessException;
@@ -12,7 +11,6 @@ import com.jh.productservice.domain.product.repository.ProductRepository;
 import com.jh.productservice.domain.wishlist.dto.WishlistResponseDTO;
 import com.jh.productservice.domain.wishlist.entity.Wishlist;
 import com.jh.productservice.domain.wishlist.repository.WishlistRepository;
-import com.jh.userservice.domain.entity.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -36,14 +34,12 @@ public class WishlistServiceImpl implements WishlistService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
 //        중복 체크
-        if (wishlistRepository.existsByMemberMemberIdAndProductProductId(memberId, productId)) {
+        if (wishlistRepository.existsByMemberIdAndProduct_ProductId(memberId, productId)) {
             throw new BusinessException(ErrorCode.PRODUCT_ALREADY_IN_WISHLIST);
         }
 
 //        위시리스트 저장
-        Wishlist wishlist = Wishlist.createWishlist(
-                Member.builder().memberId(memberId).build(), product
-        );
+        Wishlist wishlist = Wishlist.createWishlist(memberId, product);
 
         wishlistRepository.save(wishlist);
 
@@ -73,8 +69,8 @@ public class WishlistServiceImpl implements WishlistService {
     }
 
     @Override
-    public ApiResponse<?> removeProductFromWishlist(Long memberId, Long productId) {
-        Wishlist wishlist = wishlistRepository.findByMemberMemberIdAndProductProductId(memberId, productId)
+    public ApiResponse<?> removeProductFromWishlist(Long memberId,Long wishlistId) {
+        Wishlist wishlist = wishlistRepository.findByWishlistIdAndMemberId(wishlistId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WISHLIST_ITEM_NOT_FOUND));
 
         wishlistRepository.delete(wishlist);
@@ -93,7 +89,7 @@ public class WishlistServiceImpl implements WishlistService {
         int startIndex = (int) ((cursor - 1) * size);
 
 //        회원의 위시리스트 조회 및 정렬
-        List<Wishlist> wishlists = wishlistRepository.findAllByMemberMemberId(memberId, Sort.by(Sort.Direction.ASC, "wishlistId"));
+        List<Wishlist> wishlists = wishlistRepository.findAllByMemberId(memberId, Sort.by(Sort.Direction.ASC, "wishlistId"));
 
 //        현재 커서에 맞는 데이터 필터링 (인덱스 기준 슬라이싱)
         List<Wishlist> paginatedWishlists = wishlists.stream()
@@ -125,7 +121,7 @@ public class WishlistServiceImpl implements WishlistService {
 
                     return new WishlistResponseDTO(
                             wishlist.getWishlistId(),
-                            wishlist.getMember().getMemberId(),
+                            wishlist.getMemberId(),
                             product.getProductId(),
                             product.getProductName(),
                             product.getPrice(),
@@ -151,7 +147,7 @@ public class WishlistServiceImpl implements WishlistService {
 
         //위시리스트 삭제
         try {
-            wishlistRepository.deleteAllByMember_MemberId(memberId);
+            wishlistRepository.deleteAllByMemberId(memberId);
             return ApiResponse.success( "위시리스트의 모든 항목이 삭제되었습니다.");
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);

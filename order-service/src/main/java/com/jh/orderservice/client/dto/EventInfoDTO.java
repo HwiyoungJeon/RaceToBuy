@@ -12,13 +12,9 @@ import java.math.BigDecimal;
 public class EventInfoDTO {
 
     private Long eventId;
-
     private String eventName;
-
     private Double discountRate;
-
     private BigDecimal discountPrice;
-
     private BigDecimal priceDifference;
 
 }

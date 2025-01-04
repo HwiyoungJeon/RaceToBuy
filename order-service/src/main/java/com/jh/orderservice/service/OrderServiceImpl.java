@@ -48,9 +48,9 @@ public class OrderServiceImpl implements OrderService {
     public ApiResponse<?> createOrder(Long memberId, List<OrderRequestDTO> orderRequests) {
         MemberResponse member = findMemberById(memberId);
         Order order = createAndSaveOrder(member);
-
+        
         processOrderDetails(order, orderRequests);
-
+        
         return ApiResponse.success("주문이 성공적으로 생성되었습니다.");
     }
 
@@ -58,20 +58,37 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal totalPrice = BigDecimal.ZERO;
 
         for (OrderRequestDTO request : orderRequests) {
-            // 상품 정보 조회
             ProductResponse product = findProductById(request.getProductId());
 
             // 재고 확인
             try {
-                ApiResponse<Boolean> stockCheckResponse =
-                        productClient.checkStock(product.getProductId(), request.getQuantity());
+                ApiResponse<Boolean> stockCheckResponse = productClient.checkStock(
+                        product.getProductId(),
+                        request.getQuantity()
+                );
+
                 if (!Boolean.TRUE.equals(stockCheckResponse.getData())) {
                     throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
                 }
+
+                // 재고 감소 처리
+                try {
+                    StockUpdateRequest stockUpdateRequest = new StockUpdateRequest(product.getProductId(), request.getQuantity());
+                    ApiResponse<Boolean> decreaseStockResponse = productClient.decreaseStock(stockUpdateRequest);
+                    log.debug("Stock update response: " + decreaseStockResponse);
+                    if (!Boolean.TRUE.equals(decreaseStockResponse.getData())) {
+                        throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+                    }
+                } catch (FeignException e) {
+                    log.error("Feign exception occurred: " + e.getMessage(), e);
+                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+                }
+
             } catch (FeignException e) {
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
-            // 이벤트 적보 조회 및 가격 계산
+
+            // 이벤트 정보 조회 및 가격 계산
             BigDecimal finalPrice;
             if (request.getEventId() != null) {
                 try {
@@ -90,18 +107,16 @@ public class OrderServiceImpl implements OrderService {
                     .productId(product.getProductId())
                     .productName(product.getProductName())
                     .quantity(request.getQuantity())
-                    .price(finalPrice.multiply(BigDecimal.valueOf(request.getQuantity())))
-//                    .productSnapshot(createProductSnapshot(product))
+                    .price(product.getPrice())
+                    .discountPrice(finalPrice)
+                    .eventProductId(request.getEventId())
+                    .eventProductName(request.getEventId() != null ?
+                            productClient.getEventInfo(request.getEventId(), product.getProductId())
+                                    .getData().getEventName() : null)  // 이벤트 이름
                     .build();
 
             order.addOrderDetail(orderDetail);
             orderDetailRepository.save(orderDetail);
-
-            // 재고 감소 요청
-            productClient.decreaseStock(new StockUpdateRequest(
-                    product.getProductId(),
-                    request.getQuantity()
-            ));
 
             totalPrice = totalPrice.add(finalPrice.multiply(BigDecimal.valueOf(request.getQuantity())));
         }
@@ -133,10 +148,10 @@ public class OrderServiceImpl implements OrderService {
 
         // 재고 복구 요청
         order.getOrderDetails().forEach(detail -> {
-            productClient.increaseStock(new StockUpdateRequest(
-                    detail.getProductId(),
-                    detail.getQuantity()
-            ));
+            productClient.increaseStock(StockUpdateRequest.builder()
+                .productId(detail.getProductId())
+                .quantity(detail.getQuantity())
+                .build());
         });
 
         order.cancelOrder();
@@ -186,8 +201,12 @@ public class OrderServiceImpl implements OrderService {
     public MemberResponse findMemberById(Long memberId) {
         try {
             ApiResponse<MemberResponse> response = memberClient.getMemberById(memberId);
+            if (response == null || response.getData() == null) {
+                throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
+            }
             return response.getData();  // ApiResponse에서 실제 데이터 추출
-        } catch (FeignException.NotFound e) {
+        } catch (FeignException e) {
+            log.error("Failed to fetch member data: ", e);
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
         }
     }
@@ -210,10 +229,10 @@ public class OrderServiceImpl implements OrderService {
 
     private void restoreStock(Order order) {
         order.getOrderDetails().forEach(detail -> {
-            productClient.increaseStock(new StockUpdateRequest(
-                    detail.getProductId(),
-                    detail.getQuantity()
-            ));
+            productClient.increaseStock(StockUpdateRequest.builder()
+                .productId(detail.getProductId())
+                .quantity(detail.getQuantity())
+                .build());
         });
     }
 
@@ -312,12 +331,17 @@ public class OrderServiceImpl implements OrderService {
     private ProductResponse findProductById(Long productId) {
         try {
             ApiResponse<ProductResponse> response = productClient.getProduct(productId);
-            if (response.getData() == null) {
+            
+            if (response == null || response.getData() == null) {
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
+
             return response.getData();
         } catch (FeignException e) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        } catch (Exception e) {
+            log.error("상품 조회 중 오류 발생: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 }

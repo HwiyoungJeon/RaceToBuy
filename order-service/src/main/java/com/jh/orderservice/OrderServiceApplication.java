@@ -8,8 +8,6 @@ import org.springframework.context.annotation.ComponentScan;
 @SpringBootApplication
 @EnableFeignClients(basePackages = "com.jh.orderservice.client")
 @ComponentScan(basePackages = {"com.jh.orderservice",
-//        "com.jh.productservice",
-//        "com.jh.userservice",
         "com.jh.common"})
 public class OrderServiceApplication {
 

@@ -1,6 +1,7 @@
 package com.jh.productservice.controller;
 
 import com.jh.common.domain.page.PagedResponseDTO;
+import com.jh.common.util.ApiResponse;
 import com.jh.productservice.domain.product.dto.EventInfoDTO;
 import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
 import com.jh.productservice.domain.product.dto.StockUpdateRequest;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 @RequestMapping("/products")
 @Slf4j
 public class ProductController {
@@ -28,15 +28,21 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ResponseEntity<ProductWithEventDTO> getProductById(@PathVariable Long productId) {
+    public ResponseEntity<ApiResponse<ProductWithEventDTO>> getProduct(@PathVariable Long productId) {
         log.info("Received request for product with id: {}", productId);
-        ProductWithEventDTO product = productService.getProductById(productId);
-        return ResponseEntity.ok(product);
+        try {
+            ProductWithEventDTO product = productService.getProductById(productId);
+            return ResponseEntity.ok(ApiResponse.success(product));
+        } catch (Exception e) {
+            log.error("Error fetching product: ", e);
+            return ResponseEntity.ok(ApiResponse.successWithNoData());
+        }
     }
+
 
     @GetMapping("/{productId}/check-stock")
     public ResponseEntity<Boolean>checkStock(
-            @PathVariable Long productId, 
+            @PathVariable Long productId,
             @RequestParam Integer quantity) {
         log.info("Checking stock for product: {}, quantity: {}", productId, quantity);
         boolean hasStock = productService.checkStock(productId, quantity);
@@ -44,27 +50,27 @@ public class ProductController {
     }
 
     @PostMapping("/stock/decrease")
-    public ResponseEntity<?> decreaseStock(@RequestBody StockUpdateRequest request) {
-        log.info("Decreasing stock for product: {}, quantity: {}", 
-            request.getProductId(), request.getQuantity());
+    public ResponseEntity<ApiResponse<Void>> decreaseStock(@RequestBody StockUpdateRequest request) {
+        log.info("Decreasing stock for product: {}, quantity: {}",
+                request.getProductId(), request.getQuantity());
         productService.decreaseStock(request.getProductId(), request.getQuantity());
-        return ResponseEntity.ok("재고가 성공적으로 감소되었습니다.");
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @PostMapping("/stock/increase")
-    public ResponseEntity<?> increaseStock(@RequestBody StockUpdateRequest request) {
-        log.info("Increasing stock for product: {}, quantity: {}", 
-            request.getProductId(), request.getQuantity());
+    public ResponseEntity<ApiResponse<Void>> increaseStock(@RequestBody StockUpdateRequest request) {
+        log.info("Increasing stock for product: {}, quantity: {}",
+                request.getProductId(), request.getQuantity());
         productService.increaseStock(request.getProductId(), request.getQuantity());
-        return ResponseEntity.ok("재고가 성공적으로 증가되었습니다.");
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @GetMapping("/events/{eventId}")
-    public ResponseEntity<EventInfoDTO> getEventInfo(
+    public ResponseEntity<ApiResponse<EventInfoDTO>> getEventInfo(
             @PathVariable Long eventId,
             @RequestParam Long productId) {
         log.info("Getting event info for event: {}, product: {}", eventId, productId);
         EventInfoDTO eventInfo = productService.getEventInfo(eventId, productId);
-        return ResponseEntity.ok(eventInfo);
+        return ResponseEntity.ok(ApiResponse.success(eventInfo));
     }
 }

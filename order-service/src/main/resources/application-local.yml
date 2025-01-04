@@ -32,6 +32,15 @@ spring:
 
   application:
     name: order-service
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 5000
+      circuit breaker:
+        enabled: true
 
 server:
   port: 9003  # 로컬 환경에서 사용할 포트 (Docker와 충돌 방지)
@@ -55,6 +64,10 @@ user:
   service:
     url: "localhost:9000"
 
+product:
+  service:
+    url: "localhost:9001"
+
 resilience4j:
   circuitbreaker:
     configs:
@@ -69,5 +82,19 @@ jwt:
     key: ${JWT_SECRET_KEY:7Leo7JeF7L2U7Iqk7ZmU7J207YyF7ZW064u56rWQ7Jyh6rO87KCV7J2E64Gd64K06rOg64KY66m06ryt7Leo7JeF7ZWY7Iuk7IiY7J6I7J2E6rKB64uI64ukLg==}
 
 
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+      product-service:
+        connectTimeout: 5000
+        readTimeout: 10000
+  retry:
+    enabled: true
+    maxAttempts: 3
+    period: 100
+    maxPeriod: 1000
 
 

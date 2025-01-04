@@ -17,6 +17,7 @@ public enum OrderStatus {
     RETURNED("반품 완료"),
     CANCELLED("취소 완료"),
     DELIVERED_DAY1("배송 완료 D+1"),
+    FAILED("재고 감소 실패"),
     DELIVERED_NOT_FOUNT("이벤트의 서비스 기간이 지났습니다.");
 
     private final String description;

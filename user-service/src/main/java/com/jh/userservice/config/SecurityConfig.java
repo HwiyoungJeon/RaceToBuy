@@ -56,6 +56,7 @@ public class SecurityConfig {
                     }
                 })
                 .requestMatchers(new AntPathRequestMatcher("/users/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/orders/**")).permitAll()
                 .anyRequest().authenticated());
 
         httpSecurity.logout(httpSecurityLogoutConfigurer -> httpSecurityLogoutConfigurer.disable());
