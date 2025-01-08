@@ -52,4 +52,8 @@ public class Product extends TimeStamp {
         this.stockQuantity -= amount;
     }
 
+    public void increaseStock(int amount) {
+        this.stockQuantity += amount;
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.jh.productservice.domain.product.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.jh.common.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -32,5 +33,21 @@ public class Event extends TimeStamp {
     private LocalDateTime endDate; // 종료일
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     private List<EventProduct> eventProducts = new ArrayList<>();
+
+    public Event(String eventName, LocalDateTime startDate, LocalDateTime endDate) {
+        this.eventName = eventName;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
+    public void updateDates(LocalDateTime startDate, LocalDateTime endDate) {
+        // 시작일자가 종료일자보다 클 수 없도록 예외 처리
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("시작일자가 종료일자보다 클 수 없습니다.");
+        }
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
 }

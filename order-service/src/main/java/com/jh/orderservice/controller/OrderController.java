@@ -3,12 +3,9 @@ package com.jh.orderservice.controller;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
 import com.jh.orderservice.domain.order.dto.OrderRequestDTO;
-import com.jh.orderservice.service.OrderService;
-import com.jh.userservice.security.MemberDetails;
+import com.jh.orderservice.service.order.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,29 +25,25 @@ public class OrderController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<?>> getOrders(
-//        @RequestHeader("Authorization-Id") Long memberId,
+            @RequestHeader("X-Authorization-Id") Long memberId,
             @RequestParam(required = false, defaultValue = "0") Long cursor,
             @RequestParam(defaultValue = "10") int size) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-
-        ApiResponse<?> response = orderService.getOrdersByMemberId(memberDetails.getMemberId(), cursor, size);
+        ApiResponse<?> response = orderService.getOrdersByMemberId(memberId, cursor, size);
         return ResponseEntity.ok(response);
     }
 
     /**
      * 특정 주문 상세 조회
      *
-     * @param orderId       주문 ID
-     * @param memberDetails 사용자 인증 정보
+     * @param orderId  주문 ID
+     * @param memberId 사용자 인증 정보
      * @return ApiResponse
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<?>> getOrderDetails(
+            @RequestHeader("X-Authorization-Id") Long memberId,
             @PathVariable Long orderId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        ApiResponse<?> response = orderService.getOrderDetailsById(orderId, memberDetails.getMemberId());
+        ApiResponse<?> response = orderService.getOrderDetailsById(orderId, memberId);
         return ResponseEntity.ok(response);
     }
 
@@ -61,62 +54,63 @@ public class OrderController {
      * @return ApiResponse  주문 생성 결과
      */
     @PostMapping
-    public ApiResponse<?> createOrder(@RequestBody List<OrderRequestDTO> orderRequest) {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
+    public ResponseEntity<ApiResponse<?>> createPendingOrder(
+            @RequestHeader("X-Authorization-Id") Long memberId,
+            @RequestBody List<OrderRequestDTO> orderRequest) {
+        ApiResponse<?> response = orderService.createPendingOrder(memberId, orderRequest);
+        // 디버깅을 위한 반환 값 확인
+        System.out.println("주문 생성 응답: " + response);
+        return ResponseEntity.ok(response);
+    }
 
-            // 디버깅을 위한 로그 추가
-            System.out.println("회원 ID: " + memberDetails.getMemberId());
-            System.out.println("주문 요청 데이터: " + orderRequest);
-
-            ApiResponse<?> response = orderService.createOrder(memberDetails.getMemberId(), orderRequest);
-
-            // 디버깅을 위한 반환 값 확인
-            System.out.println("주문 생성 응답: " + response);
-
-            return response;
-        } catch (Exception e) {
-            // 예외 발생 시 처리
-            e.printStackTrace();
-            return ApiResponse.createException(404, "주문 오류발생");
-        }
+    @PostMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<?>> completeOrder(
+            @RequestHeader("X-Authorization-Id") Long memberId,
+            @PathVariable Long orderId,
+            @RequestBody List<OrderRequestDTO> orderRequest) {
+        ApiResponse<?> response = orderService.completeOrder(memberId, orderId, orderRequest);
+        // 디버깅을 위한 반환 값 확인
+        System.out.println("주문 생성 응답: " + response);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * 주문 취소
      *
-     * @param memberDetails 현재 로그인한 사용자의 정보
-     * @param orderId       취소할 주문 ID
+     * @param memberId 현재 로그인한 사용자의 정보
+     * @param orderId  취소할 주문 ID
      * @return ApiResponse  주문 취소 결과
      */
     @PostMapping("/{orderId}/cancel")
-    public ApiResponse<?> cancelOrder(@PathVariable Long orderId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        return orderService.cancelOrder(memberDetails.getMemberId(), orderId);
+    public ResponseEntity<ApiResponse<?>> cancelOrder(
+            @RequestHeader("X-Authorization-Id") Long memberId,
+            @PathVariable Long orderId) {
+        ApiResponse<?> response = orderService.cancelOrder(memberId, orderId);
+        return ResponseEntity.ok(response);
     }
+
 
     /**
      * 주문 반품 요청
      *
-     * @param memberDetails 현재 로그인한 사용자의 정보
-     * @param orderId       반품할 주문 ID
+     * @param memberId 현재 로그인한 사용자의 정보
+     * @param orderId  반품할 주문 ID
      * @return ApiResponse  반품 요청 결과
      */
     @PostMapping("/{orderId}/return")
-    public ApiResponse<?> returnOrder(@PathVariable Long orderId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        MemberDetails memberDetails = (MemberDetails) auth.getPrincipal();
-        return orderService.returnOrder(memberDetails.getMemberId(), orderId);
+    public ResponseEntity<ApiResponse<?>> returnOrder(
+            @RequestHeader("X-Authorization-Id") Long memberId,
+            @PathVariable Long orderId) {
+        ApiResponse<?> response = orderService.returnOrder(memberId, orderId);
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * 배송 완료 처리
-     *
-     * @param orderId 주문 ID
-     * @return ApiResponse
-     */
+/**
+ * 배송 완료 처리
+ *
+ * @param orderId 주문 ID
+ * @return ApiResponse
+ */
 //    @PatchMapping("/{orderId}/deliver")
 //    public ResponseEntity<ApiResponse<?>> markAsDelivered(@PathVariable Long orderId) {
 //        ApiResponse<?> response = orderService.markOrderAsDelivered(orderId);

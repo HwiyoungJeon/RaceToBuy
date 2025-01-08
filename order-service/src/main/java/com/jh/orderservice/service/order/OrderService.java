@@ -1,4 +1,4 @@
-package com.jh.orderservice.service;
+package com.jh.orderservice.service.order;
 
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
@@ -8,7 +8,9 @@ import java.util.List;
 
 public interface OrderService {
 
-    ApiResponse<?> createOrder(Long memberId, List<OrderRequestDTO> orderRequest);
+    ApiResponse<?> createPendingOrder(Long memberId, List<OrderRequestDTO> orderRequest);
+
+    ApiResponse<?> completeOrder(Long memberId, Long orderId, List<OrderRequestDTO> orderRequest);
 
     ApiResponse<?> cancelOrder(Long memberId, Long orderId);
 
@@ -41,4 +43,6 @@ public interface OrderService {
      * @return ApiResponse
      */
     ApiResponse<?> getOrderDetailsById(Long orderId, Long memberId);
+
+    ApiResponse<?> processPayment(Long orderId, String paymentMethod);
 }

@@ -3,6 +3,7 @@ package com.jh.productservice.service.product;
 
 import com.jh.common.domain.page.PagedResponseDTO;
 import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
+import com.jh.productservice.domain.product.dto.EventInfoDTO;
 
 public interface  ProductService {
 
@@ -30,4 +31,12 @@ public interface  ProductService {
      * - 요청 시 존재하지 않는 상품 ID일 경우 적절한 예외 처리 필요
      */
     ProductWithEventDTO getProductById(Long productId);
+
+    boolean checkStock(Long productId, Integer quantity);
+
+    void decreaseStock(Long productId, Integer quantity);
+
+    void increaseStock(Long productId, Integer quantity);
+
+    EventInfoDTO getEventInfo(Long eventId, Long productId);
 }

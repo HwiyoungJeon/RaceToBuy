@@ -9,20 +9,25 @@ import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
 import com.jh.productservice.domain.product.entity.Event;
 import com.jh.productservice.domain.product.entity.EventProduct;
 import com.jh.productservice.domain.product.entity.Product;
+import com.jh.productservice.domain.product.repository.EventProductRepository;
 import com.jh.productservice.domain.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final EventProductRepository eventProductRepository;
 
     /**
      * 커서 기반 페이지네이션을 사용하여 상품 목록을 조회합니다.
@@ -49,6 +54,12 @@ public class ProductServiceImpl implements ProductService {
         // 데이터 전체를 정렬하여 가져오기
         List<Product> products = productRepository.findAll(Sort.by(Sort.Direction.ASC, "productId"));
 
+        // 종료되지 않은 이벤트만 포함하도록 필터링
+//        List<Product> filteredProducts = products.stream()
+//                .filter(product -> product.getEventProducts().stream()
+//                        .anyMatch(eventProduct -> eventProduct.getEvent().getEndDate().isAfter(LocalDateTime.now())))
+//                .collect(Collectors.toList());
+
         // 현재 커서에 맞는 데이터 필터링 (인덱스 기준 슬라이싱)
         List<Product> paginatedProducts = products.stream()
                 .skip(startIndex)  // 커서 기반으로 시작점 이동
@@ -58,10 +69,23 @@ public class ProductServiceImpl implements ProductService {
         // 상품 목록 -> DTO 변환
         List<ProductWithEventDTO> productDtos = paginatedProducts.stream()
                 .map(this::mapProductToDto)
+                .map(productWithEventDTO -> {
+                    // 종료된 이벤트를 제외
+                    List<EventInfoDTO> activeEvents = productWithEventDTO.events().stream()
+                            .filter(eventInfoDTO -> eventInfoDTO.endDate().isAfter(LocalDateTime.now())) // 종료된 이벤트 제외
+                            .collect(Collectors.toList());
+                    return new ProductWithEventDTO(
+                            productWithEventDTO.productId(),
+                            productWithEventDTO.productName(),
+                            productWithEventDTO.price(),
+                            productWithEventDTO.stockQuantity(),
+                            activeEvents
+                    );
+                })
                 .collect(Collectors.toList());
 
         // 다음 커서 계산
-        boolean hasMore = products.size() > startIndex + size;
+        boolean hasMore = paginatedProducts.size() > startIndex + size;
 
         return new PagedResponseDTO<>(cursor, size, productDtos,hasMore);
     }
@@ -134,7 +158,48 @@ public class ProductServiceImpl implements ProductService {
                 event.getEventName(),
                 eventProduct.getDiscountRate().doubleValue(),
                 discountPrice,
-                priceDifference
+                priceDifference,
+                event.getStartDate(),  // startDate
+                event.getEndDate()
         );
+    }
+
+    @Override
+    public boolean checkStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        return product.getStockQuantity() >= quantity;
+    }
+
+    @Override
+    @Transactional
+    public void decreaseStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        
+        if (product.getStockQuantity() < quantity) {
+            throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+        }
+        
+        product.reduceStock(quantity);
+        productRepository.save(product);
+    }
+
+    @Override
+    @Transactional
+    public void increaseStock(Long productId, Integer quantity) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        
+        product.updateStockQuantity(product.getStockQuantity() + quantity);
+        productRepository.save(product);
+    }
+
+    @Override
+    public EventInfoDTO getEventInfo(Long eventId, Long productId) {
+        EventProduct eventProduct = eventProductRepository.findByEvent_EventIdAndProduct_ProductId(eventId, productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.EVENT_NOT_FOUND));
+        
+        return mapEventProductToEventInfoDto(eventProduct);
     }
 }

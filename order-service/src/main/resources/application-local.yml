@@ -1,0 +1,100 @@
+## application-local.yml
+spring:
+  config:
+    activate:
+      on-profile: local  # 이 파일이 local 프로파일용임을 명시
+
+  datasource:
+    url: jdbc:mysql://localhost:3307/racetobuy
+    username: root
+    password: 1234
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect  # 권장되는 Dialect로 변경
+
+  mail:
+    host: smtp.mailtrap.io
+    port: 2525
+    username: ${email}
+    password: ${email_password} # Mailtrap에서 제공하는 비밀번호
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  application:
+    name: order-service
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 5000
+      circuit breaker:
+        enabled: true
+
+server:
+  port: 9003  # 로컬 환경에서 사용할 포트 (Docker와 충돌 방지)
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+    non-secure-port-enabled: true
+    metadata-map:
+      instanceId: ${spring.application.name}:${random.value}
+
+user:
+  service:
+    url: "localhost:9000"
+
+product:
+  service:
+    url: "localhost:9001"
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+
+
+jwt:
+  secret:
+    key: ${JWT_SECRET_KEY:7Leo7JeF7L2U7Iqk7ZmU7J207YyF7ZW064u56rWQ7Jyh6rO87KCV7J2E64Gd64K06rOg64KY66m06ryt7Leo7JeF7ZWY7Iuk7IiY7J6I7J2E6rKB64uI64ukLg==}
+
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+      product-service:
+        connectTimeout: 5000
+        readTimeout: 10000
+  retry:
+    enabled: true
+    maxAttempts: 3
+    period: 100
+    maxPeriod: 1000
+
+

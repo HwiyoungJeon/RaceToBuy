@@ -1,5 +1,6 @@
 package com.jh.orderservice.domain.order.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jh.common.domain.timestamp.TimeStamp;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -22,6 +23,7 @@ public class OrderDetail extends TimeStamp {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
+    @JsonIgnoreProperties("orderDetails")
     private Order order;
 
 //

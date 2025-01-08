@@ -20,9 +20,9 @@ public interface WishlistService {
      * 위시리스트에서 상품 제거
      *
      * @param memberId  회원 ID
-     * @param productId 상품 ID
+     * @param wishlistId 상품 ID
      */
-    ApiResponse<?> removeProductFromWishlist(Long memberId, Long productId);
+    ApiResponse<?> removeProductFromWishlist(Long memberId, Long wishlistId);
 
     /**
      * 회원의 위시리스트 조회

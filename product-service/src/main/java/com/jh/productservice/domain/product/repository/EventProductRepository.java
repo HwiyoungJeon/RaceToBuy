@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface EventProductRepository extends JpaRepository<EventProduct, Long> {
     Optional<EventProduct> findByEvent_EventIdAndProduct_ProductId(Long eventId, Long productId);
+    boolean existsByProduct_ProductIdAndEvent_EventId(Long productId, Long eventId);
 }

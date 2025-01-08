@@ -2,6 +2,7 @@ package com.jh.common.util;
 
 
 import com.jh.common.constant.ErrorCode;
+import com.jh.common.constant.PaymentFailureReason;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -58,6 +59,19 @@ public class ApiResponse<T> {
 
     public static ApiResponse<String> createException(ErrorCode errorCode) {
         return new ApiResponse<>(errorCode.getStatusCode(), errorCode.getMessage(), null);
+    }
+
+    public static <T> ApiResponse<T> error(ErrorCode errorCode) {
+        return new ApiResponse<>(errorCode.getStatusCode(), errorCode.getMessage(), null);
+    }
+
+    public static <T> ApiResponse<T> fail(int code, String message) {
+        return new ApiResponse<>(code, message, null);
+    }
+
+    public static ApiResponse<String> paymentError(ErrorCode errorCode,PaymentFailureReason failureReason) {
+        return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(),
+                errorCode.getMessage() + failureReason.getDescription(), null);
     }
 
     /**
