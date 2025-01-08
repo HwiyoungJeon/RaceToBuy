@@ -1,9 +1,10 @@
-package com.jh.orderservice.service;
+package com.jh.orderservice.service.order;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jh.common.constant.ErrorCode;
 import com.jh.common.constant.OrderStatus;
+import com.jh.common.constant.PaymentStatus;
 import com.jh.common.domain.page.PagedResponseDTO;
 import com.jh.common.exception.BusinessException;
 import com.jh.common.util.ApiResponse;
@@ -21,6 +22,9 @@ import com.jh.orderservice.domain.order.entity.Order;
 import com.jh.orderservice.domain.order.entity.OrderDetail;
 import com.jh.orderservice.domain.order.repository.OrderDetailRepository;
 import com.jh.orderservice.domain.order.repository.OrderRepository;
+import com.jh.orderservice.domain.payment.entity.Payment;
+import com.jh.orderservice.domain.payment.repository.PaymentRepository;
+import com.jh.orderservice.service.payment.PaymentService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,16 +47,39 @@ public class OrderServiceImpl implements OrderService {
     private final MemberClient memberClient;
     private final ProductServiceClient productClient;
     private final ObjectMapper objectMapper;
+    private final PaymentService paymentService;
+    private final PaymentRepository paymentRepository;
 
     @Override
     @Transactional
-    public ApiResponse<?> createOrder(Long memberId, List<OrderRequestDTO> orderRequests) {
+    public ApiResponse<?> createPendingOrder(Long memberId, List<OrderRequestDTO> orderRequests) {
         MemberResponse member = findMemberById(memberId);
         Order order = createAndSaveOrder(member);
-        
+
         processOrderDetails(order, orderRequests);
-        
+
         return ApiResponse.success("주문이 성공적으로 생성되었습니다.");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<?> completeOrder(Long memberId, Long orderId, List<OrderRequestDTO> orderRequests) {
+        Order order = findOrderByIdAndMemberId(orderId, memberId);
+
+        Payment payment = paymentRepository.findByOrder(order)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        if (!PaymentStatus.COMPLETED.equals(payment.getPaymentStatus())) {
+            // 결제 상태가 '결제 완료'가 아니면 에러 반환
+            return ApiResponse.fail(400, "결제가 완료되지 않았습니다. 결제 상태를 확인하세요.");
+        }
+
+//        processOrderDetails(order, orderRequests);
+
+        order.updateOrderStatus(OrderStatus.ORDERED);
+        orderRepository.save(order);
+
+        return ApiResponse.success("주문이 성공적으로 완료 되었습니다.");
     }
 
     private void processOrderDetails(Order order, List<OrderRequestDTO> orderRequests) {
@@ -62,37 +90,53 @@ public class OrderServiceImpl implements OrderService {
 
             // 재고 확인
             try {
-                ApiResponse<Boolean> stockCheckResponse = productClient.checkStock(
+                log.debug("Requesting stock check for productId: {} with quantity: {}", product.getProductId(), request.getQuantity());
+                Boolean stockCheckResponse  = productClient.checkStock(
                         product.getProductId(),
                         request.getQuantity()
                 );
+                log.debug("Stock check response: " + stockCheckResponse);
+//                ApiResponse<Boolean> stockCheckResponse = response.getBody();
+//                if (!Boolean.TRUE.equals(stockCheckResponse.getData())) {
+//                    throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
+//                }
 
-                if (!Boolean.TRUE.equals(stockCheckResponse.getData())) {
+                if (!stockCheckResponse) {
                     throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
                 }
 
-                // 재고 감소 처리
-                try {
-                    StockUpdateRequest stockUpdateRequest = new StockUpdateRequest(product.getProductId(), request.getQuantity());
-                    ApiResponse<Boolean> decreaseStockResponse = productClient.decreaseStock(stockUpdateRequest);
-                    log.debug("Stock update response: " + decreaseStockResponse);
-                    if (!Boolean.TRUE.equals(decreaseStockResponse.getData())) {
-                        throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-                    }
                 } catch (FeignException e) {
-                    log.error("Feign exception occurred: " + e.getMessage(), e);
-                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-                }
-
-            } catch (FeignException e) {
+                log.error("FeignException during stock check: " + e.getMessage(), e);
+                log.error("Response body: " + e.contentUTF8());  // 응답 내용 추가 로그
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
+//                // 재고 감소 처리
+//                try {
+//                    StockUpdateRequest stockUpdateRequest = new StockUpdateRequest(product.getProductId(), request.getQuantity());
+//                    ApiResponse<Boolean> decreaseStockResponse = productClient.decreaseStock(stockUpdateRequest);
+//                    log.debug("Stock update response: " + decreaseStockResponse);
+//                    if (!Boolean.TRUE.equals(decreaseStockResponse.getData())) {
+//                        throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+//                    }
+//                } catch (FeignException e) {
+//                    log.error("Feign exception occurred: " + e.getMessage(), e);
+//                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
+//                }
+//
+//            } catch (FeignException e) {
+//                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+//            }
 
             // 이벤트 정보 조회 및 가격 계산
             BigDecimal finalPrice;
             if (request.getEventId() != null) {
                 try {
                     EventInfoDTO eventInfo = productClient.getEventInfo(request.getEventId(), product.getProductId()).getData();
+
+                    if (eventInfo.getEndDate().isBefore(LocalDateTime.now())) {
+                        throw new BusinessException(ErrorCode.EVENT_SERVICE_EXPIRED); // 종료된 이벤트
+                    }
+
                     finalPrice = eventInfo.getDiscountPrice();
                 } catch (FeignException e) {
                     throw new BusinessException(ErrorCode.EVENT_NOT_FOUND);
@@ -124,6 +168,21 @@ public class OrderServiceImpl implements OrderService {
         order.updateTotalPrice(totalPrice);
     }
 
+    // 주문 상세 생성 메서드
+//    private OrderDetail createOrderDetail(Order order, OrderRequestDTO request, ProductResponse product, BigDecimal finalPrice) {
+//        return OrderDetail.builder()
+//                .order(order)
+//                .productId(product.getProductId())
+//                .productName(product.getProductName())
+//                .quantity(request.getQuantity())
+//                .price(product.getPrice())
+//                .discountPrice(finalPrice)
+//                .eventProductId(request.getEventId())
+//                .eventProductName(request.getEventId() != null ?
+//                        productClient.getEventInfo(request.getEventId(), product.getProductId()).getData().getEventName() : null)
+//                .build();
+//    }
+
     private String createProductSnapshot(ProductResponse product) {
         try {
             return objectMapper.writeValueAsString(product);
@@ -149,9 +208,9 @@ public class OrderServiceImpl implements OrderService {
         // 재고 복구 요청
         order.getOrderDetails().forEach(detail -> {
             productClient.increaseStock(StockUpdateRequest.builder()
-                .productId(detail.getProductId())
-                .quantity(detail.getQuantity())
-                .build());
+                    .productId(detail.getProductId())
+                    .quantity(detail.getQuantity())
+                    .build());
         });
 
         order.cancelOrder();
@@ -219,7 +278,7 @@ public class OrderServiceImpl implements OrderService {
     private Order createAndSaveOrder(MemberResponse member) {
         Order order = Order.builder()
                 .memberId(member.getId())
-                .orderStatus(OrderStatus.ORDERED)
+                .orderStatus(OrderStatus.ORDER_PENDING)
                 .totalPrice(BigDecimal.ZERO)
                 .dayOffset(0) // 초기값 설정
                 .build();
@@ -230,9 +289,9 @@ public class OrderServiceImpl implements OrderService {
     private void restoreStock(Order order) {
         order.getOrderDetails().forEach(detail -> {
             productClient.increaseStock(StockUpdateRequest.builder()
-                .productId(detail.getProductId())
-                .quantity(detail.getQuantity())
-                .build());
+                    .productId(detail.getProductId())
+                    .quantity(detail.getQuantity())
+                    .build());
         });
     }
 
@@ -255,13 +314,14 @@ public class OrderServiceImpl implements OrderService {
 
         // dayOffset 기반 상태 변경
         switch (dayOffsetRequest.getDayOffset()) {
-            case 0 -> order.updateOrderStatus(OrderStatus.ORDERED); // 초기 상태
-            case 1 -> order.updateOrderStatus(OrderStatus.SHIPPING); // 배송중
-            case 2 -> order.updateOrderStatus(OrderStatus.DELIVERED); // 배송 완료
-            case 3 -> order.updateOrderStatus(OrderStatus.DELIVERED_DAY1);
-            case 4 -> order.updateOrderStatus(OrderStatus.DELIVERED_NOT_FOUNT);
+            case 0 -> order.updateOrderStatus(OrderStatus.ORDER_PENDING); // 초기 상태
+            case 1 -> order.updateOrderStatus(OrderStatus.ORDERED); // 배송중
+            case 2 -> order.updateOrderStatus(OrderStatus.SHIPPING); // 배송 완료
+            case 3 -> order.updateOrderStatus(OrderStatus.DELIVERED);
+            case 4 -> order.updateOrderStatus(OrderStatus.DELIVERED_DAY1);
+            case 5 -> order.updateOrderStatus(OrderStatus.DELIVERED_NOT_FOUNT);
             default -> {
-                if (dayOffsetRequest.getDayOffset() >= 5) {
+                if (dayOffsetRequest.getDayOffset() >= 6) {
                     throw new BusinessException(ErrorCode.EVENT_SERVICE_EXPIRED); // 4 이상이면 에러 처리
                 }
                 throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS); // 그 외 에러 처리
@@ -331,7 +391,7 @@ public class OrderServiceImpl implements OrderService {
     private ProductResponse findProductById(Long productId) {
         try {
             ApiResponse<ProductResponse> response = productClient.getProduct(productId);
-            
+
             if (response == null || response.getData() == null) {
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
@@ -343,5 +403,11 @@ public class OrderServiceImpl implements OrderService {
             log.error("상품 조회 중 오류 발생: {}", e.getMessage());
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Override
+    public ApiResponse<?> processPayment(Long orderId, String paymentMethod) {
+        // 결제 프로세스 호출
+        return paymentService.processPayment(orderId, paymentMethod);  // 결제 서비스에 위임
     }
 }

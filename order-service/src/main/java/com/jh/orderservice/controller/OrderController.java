@@ -3,7 +3,7 @@ package com.jh.orderservice.controller;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
 import com.jh.orderservice.domain.order.dto.OrderRequestDTO;
-import com.jh.orderservice.service.OrderService;
+import com.jh.orderservice.service.order.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,10 +54,21 @@ public class OrderController {
      * @return ApiResponse  주문 생성 결과
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<?>> createOrder(
+    public ResponseEntity<ApiResponse<?>> createPendingOrder(
             @RequestHeader("X-Authorization-Id") Long memberId,
             @RequestBody List<OrderRequestDTO> orderRequest) {
-        ApiResponse<?> response = orderService.createOrder(memberId, orderRequest);
+        ApiResponse<?> response = orderService.createPendingOrder(memberId, orderRequest);
+        // 디버깅을 위한 반환 값 확인
+        System.out.println("주문 생성 응답: " + response);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<?>> completeOrder(
+            @RequestHeader("X-Authorization-Id") Long memberId,
+            @PathVariable Long orderId,
+            @RequestBody List<OrderRequestDTO> orderRequest) {
+        ApiResponse<?> response = orderService.completeOrder(memberId, orderId, orderRequest);
         // 디버깅을 위한 반환 값 확인
         System.out.println("주문 생성 응답: " + response);
         return ResponseEntity.ok(response);
@@ -87,7 +98,7 @@ public class OrderController {
      * @return ApiResponse  반품 요청 결과
      */
     @PostMapping("/{orderId}/return")
-    public ResponseEntity<ApiResponse<?>>  returnOrder(
+    public ResponseEntity<ApiResponse<?>> returnOrder(
             @RequestHeader("X-Authorization-Id") Long memberId,
             @PathVariable Long orderId) {
         ApiResponse<?> response = orderService.returnOrder(memberId, orderId);

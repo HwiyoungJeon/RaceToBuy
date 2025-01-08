@@ -1,7 +1,7 @@
 package com.jh.orderservice.domain.refund;
 
 import com.jh.common.domain.timestamp.TimeStamp;
-import com.jh.orderservice.domain.payment.Payment;
+import com.jh.orderservice.domain.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

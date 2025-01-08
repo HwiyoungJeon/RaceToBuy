@@ -2,6 +2,7 @@ package com.jh.common.util;
 
 
 import com.jh.common.constant.ErrorCode;
+import com.jh.common.constant.PaymentFailureReason;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -68,6 +69,10 @@ public class ApiResponse<T> {
         return new ApiResponse<>(code, message, null);
     }
 
+    public static ApiResponse<String> paymentError(ErrorCode errorCode,PaymentFailureReason failureReason) {
+        return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(),
+                errorCode.getMessage() + failureReason.getDescription(), null);
+    }
 
     /**
      * 🔥 addData 메서드 (data를 Map으로 확장하여 추가 데이터 삽입)

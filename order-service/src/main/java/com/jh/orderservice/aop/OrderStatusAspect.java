@@ -2,12 +2,15 @@ package com.jh.orderservice.aop;
 
 import com.jh.common.constant.ErrorCode;
 import com.jh.common.constant.OrderStatus;
+import com.jh.common.constant.PaymentStatus;
 import com.jh.common.exception.BusinessException;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.entity.Order;
 import com.jh.orderservice.domain.order.repository.OrderRepository;
 import com.jh.orderservice.client.ProductServiceClient;
 import com.jh.orderservice.client.dto.StockUpdateRequest;
+import com.jh.orderservice.domain.payment.entity.Payment;
+import com.jh.orderservice.domain.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -22,9 +25,11 @@ public class OrderStatusAspect {
 
     private final OrderRepository orderRepository;
     private final ProductServiceClient productClient;
+    private final PaymentRepository paymentRepository;
 
     @AfterReturning(
-        pointcut = "execution(* com.jh.orderservice.service.OrderServiceImpl.createOrder(..))",
+//        pointcut = "execution(* com.jh.orderservice.service.order.OrderServiceImpl.createOrder(..))",
+        pointcut = "execution(* com.jh.orderservice.service.payment.PaymentServiceImpl.processPayment(..))",
         returning = "result"
     )
     public void decreaseStockAfterOrderCreation(Object result) {
@@ -34,8 +39,19 @@ public class OrderStatusAspect {
             return;
         }
 
+        // 주문 조회
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        // 결제 정보 조회
+        Payment payment = paymentRepository.findByOrder(order)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        // 결제 완료 상태 확인
+        if (!PaymentStatus.COMPLETED.equals(payment.getPaymentStatus())) {
+            log.warn("결제 완료되지 않은 주문에 대해 재고 차감하지 않습니다.");
+            return;
+        }
 
         try {
             order.getOrderDetails().forEach(detail -> {
@@ -58,7 +74,7 @@ public class OrderStatusAspect {
         }
     }
 
-    @AfterReturning(pointcut = "execution(* com.jh.orderservice.service.OrderServiceImpl.updateOrderStatus(..)) || execution(* com.jh.orderservice.service.OrderServiceImpl.returnOrder(..))", returning = "result")
+    @AfterReturning(pointcut = "execution(* com.jh.orderservice.service.order.OrderServiceImpl.updateOrderStatus(..)) || execution(* com.jh.orderservice.service.order.OrderServiceImpl.returnOrder(..))", returning = "result")
     public void updateOrderStatusAfterProcessing(Object result) {
         // 결과에서 Order ID 추출
         Long updatedOrderId = extractOrderIdFromResult(result);

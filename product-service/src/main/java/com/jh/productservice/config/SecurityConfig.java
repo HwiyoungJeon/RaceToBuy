@@ -24,6 +24,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/products/**").permitAll()
                 .requestMatchers("/wishlist/**").permitAll()
+                .requestMatchers("/events/**").permitAll()
                 .anyRequest().authenticated());
 
         return http.build();

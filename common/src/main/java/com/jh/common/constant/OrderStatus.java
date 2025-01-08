@@ -10,6 +10,7 @@ import java.util.Arrays;
 @Getter
 @AllArgsConstructor
 public enum OrderStatus {
+    ORDER_PENDING("주문 대기"),
     ORDERED("주문 완료"),
     SHIPPING("배송 중"),
     DELIVERED("배송 완료"),
@@ -18,7 +19,8 @@ public enum OrderStatus {
     CANCELLED("취소 완료"),
     DELIVERED_DAY1("배송 완료 D+1"),
     FAILED("재고 감소 실패"),
-    DELIVERED_NOT_FOUNT("이벤트의 서비스 기간이 지났습니다.");
+    DELIVERED_NOT_FOUNT("이벤트의 서비스 기간이 지났습니다.")
+    ; // 새로운 주문 대기 상태 추가
 
     private final String description;
 

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -62,7 +63,9 @@ public class WishlistServiceImpl implements WishlistService {
                                 product.getPrice()
                                         .subtract(product.getPrice()
                                                 .multiply(BigDecimal.valueOf(eventProduct.getDiscountRate().doubleValue())
-                                                        .divide(BigDecimal.valueOf(100))))
+                                                        .divide(BigDecimal.valueOf(100)))),
+                                eventProduct.getEvent().getStartDate(),
+                                eventProduct.getEvent().getEndDate()
                         ))
                         .collect(Collectors.toList())
         );
@@ -115,9 +118,13 @@ public class WishlistServiceImpl implements WishlistService {
                                         eventProduct.getEvent().getEventName(),
                                         eventProduct.getDiscountRate().doubleValue(),
                                         discountPrice,
-                                        priceDifference
+                                        priceDifference,
+                                        eventProduct.getEvent().getStartDate(),
+                                        eventProduct.getEvent().getEndDate()
                                 );
-                            }).collect(Collectors.toList());
+                            })
+                            .filter(eventCheckDTO -> eventCheckDTO.endDate().isAfter(LocalDateTime.now())) // 종료된 이벤트 제외
+                            .collect(Collectors.toList());
 
                     return new WishlistResponseDTO(
                             wishlist.getWishlistId(),

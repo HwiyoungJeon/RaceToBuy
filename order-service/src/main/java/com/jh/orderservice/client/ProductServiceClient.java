@@ -23,7 +23,7 @@ public interface ProductServiceClient {
     ApiResponse<ProductResponse> getProduct(@PathVariable("productId") Long productId);
 
     @GetMapping("/products/{productId}/check-stock")
-    ApiResponse<Boolean> checkStock(
+    Boolean checkStock(
         @PathVariable("productId") Long productId,
         @RequestParam(value = "quantity", required = true) Integer quantity
     );

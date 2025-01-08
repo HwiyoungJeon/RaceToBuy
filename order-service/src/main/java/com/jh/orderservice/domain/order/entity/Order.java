@@ -1,5 +1,6 @@
 package com.jh.orderservice.domain.order.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jh.common.constant.ErrorCode;
 import com.jh.common.constant.OrderStatus;
 import com.jh.common.domain.timestamp.TimeStamp;
@@ -43,6 +44,7 @@ public class Order extends TimeStamp {
     private int dayOffset;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<OrderDetail> orderDetails = new ArrayList<>();
 
 

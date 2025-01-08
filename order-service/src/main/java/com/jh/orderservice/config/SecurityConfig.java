@@ -23,6 +23,7 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/orders/**").permitAll()
+                .requestMatchers("/payments/**").permitAll()
                 .anyRequest().authenticated());
 
         return http.build();
