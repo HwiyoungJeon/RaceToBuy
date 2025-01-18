@@ -97,14 +97,14 @@
 ```plaintext
 ├── eureka-server
 ├── api-gateway
-├── commons
+├── common
 ├── order-service
 ├── product-service
 └── user-service
 ```
 - **eureka-server**: 서비스 디스커버리와 로드 밸런싱 제공.
 - **api-gateway**: 모든 서비스의 진입점으로, 인증 및 요청 라우팅 담당.
-- **commons**: 공통 유틸리티와 DTO 관리.
+- **common**: 공통 유틸리티와 DTO 관리.
 - **order-service**: 주문 처리 및 결제 상태 관리.
 - **product-service**: 상품 정보와 재고 관리.
 - **user-service**: 회원 관리 및 인증.
