@@ -91,7 +91,8 @@
 ---
 
 ## 🔧 서버 아키텍처
-![image](https://github.com/user-attachments/assets/6e12ebf1-c29b-4ac0-a9e9-4af9221a4ff7)
+![image](https://github.com/user-attachments/assets/9c5033f8-af69-4e39-9b92-7bc3d5ecfc1b)
+
 
 ```plaintext
 ├── eureka-server
