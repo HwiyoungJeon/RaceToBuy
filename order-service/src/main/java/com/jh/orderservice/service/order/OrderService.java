@@ -3,6 +3,7 @@ package com.jh.orderservice.service.order;
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.order.dto.DayOffsetRequest;
 import com.jh.orderservice.domain.order.dto.OrderRequestDTO;
+import com.jh.orderservice.domain.payment.dto.PaymentResponseDto;
 
 import java.util.List;
 
@@ -44,5 +45,5 @@ public interface OrderService {
      */
     ApiResponse<?> getOrderDetailsById(Long orderId, Long memberId);
 
-    ApiResponse<?> processPayment(Long orderId, String paymentMethod);
+    PaymentResponseDto processPayment(Long orderId, String paymentMethod);
 }

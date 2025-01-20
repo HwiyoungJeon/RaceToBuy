@@ -5,10 +5,11 @@ import com.jh.common.constant.OrderStatus;
 import com.jh.common.constant.PaymentStatus;
 import com.jh.common.exception.BusinessException;
 import com.jh.common.util.ApiResponse;
-import com.jh.orderservice.domain.order.entity.Order;
-import com.jh.orderservice.domain.order.repository.OrderRepository;
 import com.jh.orderservice.client.ProductServiceClient;
 import com.jh.orderservice.client.dto.StockUpdateRequest;
+import com.jh.orderservice.domain.order.entity.Order;
+import com.jh.orderservice.domain.order.repository.OrderRepository;
+import com.jh.orderservice.domain.payment.dto.PaymentResponseDto;
 import com.jh.orderservice.domain.payment.entity.Payment;
 import com.jh.orderservice.domain.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,53 +27,6 @@ public class OrderStatusAspect {
     private final OrderRepository orderRepository;
     private final ProductServiceClient productClient;
     private final PaymentRepository paymentRepository;
-
-    @AfterReturning(
-//        pointcut = "execution(* com.jh.orderservice.service.order.OrderServiceImpl.createOrder(..))",
-        pointcut = "execution(* com.jh.orderservice.service.payment.PaymentServiceImpl.processPayment(..))",
-        returning = "result"
-    )
-    public void decreaseStockAfterOrderCreation(Object result) {
-        Long orderId = extractOrderIdFromResult(result);
-        if (orderId == null) {
-            log.warn("주문 ID를 찾을 수 없습니다.");
-            return;
-        }
-
-        // 주문 조회
-        Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-
-        // 결제 정보 조회
-        Payment payment = paymentRepository.findByOrder(order)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
-
-        // 결제 완료 상태 확인
-        if (!PaymentStatus.COMPLETED.equals(payment.getPaymentStatus())) {
-            log.warn("결제 완료되지 않은 주문에 대해 재고 차감하지 않습니다.");
-            return;
-        }
-
-        try {
-            order.getOrderDetails().forEach(detail -> {
-                ApiResponse<Boolean> response = productClient.decreaseStock(
-                    StockUpdateRequest.builder()
-                        .productId(detail.getProductId())
-                        .quantity(detail.getQuantity())
-                        .build()
-                );
-
-                if (response == null || !Boolean.TRUE.equals(response.getData())) {
-                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-                }
-            });
-        } catch (Exception e) {
-            log.error("재고 감소 실패: {}", e.getMessage());
-            order.updateOrderStatus(OrderStatus.FAILED);
-            orderRepository.save(order);
-            throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-        }
-    }
 
     @AfterReturning(pointcut = "execution(* com.jh.orderservice.service.order.OrderServiceImpl.updateOrderStatus(..)) || execution(* com.jh.orderservice.service.order.OrderServiceImpl.returnOrder(..))", returning = "result")
     public void updateOrderStatusAfterProcessing(Object result) {
@@ -108,16 +62,17 @@ public class OrderStatusAspect {
         System.out.println("Order ID " + updatedOrderId + " successfully processed.");
     }
     private Long extractOrderIdFromResult(Object result) {
-        if (result instanceof ApiResponse) {
-            ApiResponse<?> apiResponse = (ApiResponse<?>) result;
+        // result가 PaymentResponseDto인 경우
+        if (result instanceof PaymentResponseDto paymentResponse) {
 
-            if (apiResponse.getData() instanceof Long) {
-                return (Long) apiResponse.getData();
-            }
+            // orderId 반환
+            return paymentResponse.getOrderId();
         }
 
-        return null;
+        // result가 PaymentResponseDto가 아닌 경우 예외 처리
+        throw new BusinessException(ErrorCode.INVALID_RESULT_TYPE);
     }
+
 
     /**
      * 반품 완료 시 재고 복구 로직
@@ -129,6 +84,36 @@ public class OrderStatusAspect {
                 detail.getQuantity()
             ));
         });
+    }
+
+    /**
+     * 재고 복구 및 결제 취소
+     */
+    private void restoreStockForFailedOrder(Order order) {
+        // 재고 복구
+        order.getOrderDetails().forEach(detail -> {
+            ApiResponse<Boolean> restoreResponse = productClient.increaseStock(
+                    StockUpdateRequest.builder()
+                            .productId(detail.getProductId())
+                            .quantity(detail.getQuantity())
+                            .build()
+            );
+
+            if (restoreResponse == null || !Boolean.TRUE.equals(restoreResponse.getData())) {
+                log.error("재고 복구 실패: 제품 ID {}", detail.getProductId());
+            } else {
+                log.info("제품 ID {}에 대해 재고 복구 완료", detail.getProductId());
+            }
+        });
+
+        // 결제 취소 (예: 결제 상태 변경)
+        Payment payment = paymentRepository.findByOrder(order)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        payment.updateStatus(PaymentStatus.CANCELLED); // 결제 취소 상태로 변경
+        paymentRepository.save(payment);
+
+        log.info("결제 취소 완료: 주문 ID {}", order.getOrderId());
     }
 
 }

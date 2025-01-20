@@ -11,8 +11,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Getter
 @Entity
 @Table(name = "payment")
@@ -39,12 +37,6 @@ public class Payment extends TimeStamp {
     @Column(name = "failure_reason")
     private PaymentFailureReason failureReason;
 
-//    @Column(name = "created_at", nullable = false, updatable = false)
-//    private LocalDateTime createdAt;
-//
-//    @Column(name = "modified_at", nullable = false)
-//    private LocalDateTime modifiedAt;
-
     @Builder
     public Payment(Order order, String paymentMethod, PaymentStatus paymentStatus, PaymentFailureReason failureReason) {
         this.order = order;
@@ -59,6 +51,14 @@ public class Payment extends TimeStamp {
 
     public Payment withFailureReason(PaymentFailureReason failureReason) {
         return new Payment(this.order, this.paymentMethod, this.paymentStatus, failureReason);
+    }
+
+    // 새로운 updateStatus 메서드 추가
+    public void updateStatus(PaymentStatus newStatus) {
+        // 상태가 이미 새로운 상태와 같다면 변경하지 않음
+        if (this.paymentStatus != newStatus) {
+            this.paymentStatus = newStatus;
+        }
     }
 }
 

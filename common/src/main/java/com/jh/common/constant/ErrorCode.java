@@ -35,6 +35,8 @@ public enum ErrorCode {
     // 서버 관련 에러 코드
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
     UNKNOWN_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "알 수 없는 오류가 발생했습니다."),
+    INVALID_ORDER_ID_TYPE(HttpStatus.BAD_REQUEST, "주문 ID의 데이터 타입이 Long이 아닙니다."),
+    INVALID_RESULT_TYPE(HttpStatus.BAD_REQUEST, "결과 타입이 ApiResponse가 아닙니다."),
 
     //상품 관련 에러 코드
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
@@ -67,11 +69,16 @@ public enum ErrorCode {
     PAYMENT_FAILURE(HttpStatus.BAD_REQUEST, "결제 처리에 실패했습니다."),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 정보가 존재하지 않습니다."),
 
-    // 이베느 관련
+    // 이벤트 관련
     EVENT_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "이벤트가 이미 존재합니다."), // 이벤트가 이미 존재할 경우
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "시작일자가 종료일자보다 늦을 수 없습니다."), // 날짜 범위가 잘못된 경우
-    ;
+    INVALID_PAYMENT_REQUEST(HttpStatus.BAD_REQUEST, "유효하지 않은 결제 요청입니다. 주문을 다시 진행해주세요."), // 날짜 범위가 잘못된 경우
 
+    // 재고 관련
+    STOCK_UPDATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "재고 업데이트에 실패했습니다."), // 재고 업데이트 실패
+
+
+    ;
 
     private final HttpStatus httpStatus;
     private final String message;
