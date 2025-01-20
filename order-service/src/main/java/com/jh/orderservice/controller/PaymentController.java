@@ -2,6 +2,7 @@ package com.jh.orderservice.controller;
 
 import com.jh.common.util.ApiResponse;
 import com.jh.orderservice.domain.payment.dto.PaymentDto;
+import com.jh.orderservice.domain.payment.dto.PaymentResponseDto;
 import com.jh.orderservice.service.payment.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +21,11 @@ public class PaymentController {
      * @return 결제 처리 결과
      */
     @PostMapping("/{orderId}/payment")
-    public ResponseEntity<ApiResponse<?>> processPayment(
+    public ResponseEntity<PaymentResponseDto> processPayment(
             @PathVariable Long orderId,
             @RequestBody PaymentDto paymentDto) {
         // 결제 처리
-        ApiResponse<?> response = paymentService.processPayment(orderId, paymentDto.getPaymentMethod());
+        PaymentResponseDto response = paymentService.processPayment(orderId, paymentDto.getPaymentMethod());
         return ResponseEntity.ok(response);
     }
 

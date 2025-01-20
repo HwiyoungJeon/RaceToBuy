@@ -2,8 +2,8 @@ package com.jh.productservice.service.product;
 
 
 import com.jh.common.domain.page.PagedResponseDTO;
-import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
 import com.jh.productservice.domain.product.dto.EventInfoDTO;
+import com.jh.productservice.domain.product.dto.ProductWithEventDTO;
 
 public interface  ProductService {
 

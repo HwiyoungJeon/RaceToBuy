@@ -26,8 +26,6 @@ public class OrderDetail extends TimeStamp {
     @JsonIgnoreProperties("orderDetails")
     private Order order;
 
-//
-
     @Column(name = "product_id", nullable = false)
     private Long productId; // Foreign Key로 변경
 

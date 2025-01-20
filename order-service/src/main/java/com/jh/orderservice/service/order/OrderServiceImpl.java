@@ -22,6 +22,7 @@ import com.jh.orderservice.domain.order.entity.Order;
 import com.jh.orderservice.domain.order.entity.OrderDetail;
 import com.jh.orderservice.domain.order.repository.OrderDetailRepository;
 import com.jh.orderservice.domain.order.repository.OrderRepository;
+import com.jh.orderservice.domain.payment.dto.PaymentResponseDto;
 import com.jh.orderservice.domain.payment.entity.Payment;
 import com.jh.orderservice.domain.payment.repository.PaymentRepository;
 import com.jh.orderservice.service.payment.PaymentService;
@@ -29,10 +30,12 @@ import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,6 +53,10 @@ public class OrderServiceImpl implements OrderService {
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
 
+    private final RedisTemplate<String, Object> redisTemplate;
+    private static final String ORDER_KEY_PREFIX = "order:";
+    private static final long ORDER_TIMEOUT = 5; // 30분 타임아웃
+
     @Override
     @Transactional
     public ApiResponse<?> createPendingOrder(Long memberId, List<OrderRequestDTO> orderRequests) {
@@ -57,6 +64,16 @@ public class OrderServiceImpl implements OrderService {
         Order order = createAndSaveOrder(member);
 
         processOrderDetails(order, orderRequests);
+
+        // Redis에 주문 정보 저장
+        String redisKey = ORDER_KEY_PREFIX + order.getOrderId();
+
+        // 직렬화 설정을 변경하지 않고 그대로 사용
+        redisTemplate.opsForValue().set(
+                redisKey,
+                order,
+                Duration.ofMinutes(ORDER_TIMEOUT)
+        );
 
         return ApiResponse.success("주문이 성공적으로 생성되었습니다.");
     }
@@ -74,8 +91,6 @@ public class OrderServiceImpl implements OrderService {
             return ApiResponse.fail(400, "결제가 완료되지 않았습니다. 결제 상태를 확인하세요.");
         }
 
-//        processOrderDetails(order, orderRequests);
-
         order.updateOrderStatus(OrderStatus.ORDERED);
         orderRepository.save(order);
 
@@ -91,41 +106,20 @@ public class OrderServiceImpl implements OrderService {
             // 재고 확인
             try {
                 log.debug("Requesting stock check for productId: {} with quantity: {}", product.getProductId(), request.getQuantity());
-                Boolean stockCheckResponse  = productClient.checkStock(
+                Boolean stockCheckResponse = productClient.checkStock(
                         product.getProductId(),
                         request.getQuantity()
                 );
                 log.debug("Stock check response: " + stockCheckResponse);
-//                ApiResponse<Boolean> stockCheckResponse = response.getBody();
-//                if (!Boolean.TRUE.equals(stockCheckResponse.getData())) {
-//                    throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
-//                }
-
                 if (!stockCheckResponse) {
                     throw new BusinessException(ErrorCode.STOCK_NOT_ENOUGH);
                 }
 
-                } catch (FeignException e) {
+            } catch (FeignException e) {
                 log.error("FeignException during stock check: " + e.getMessage(), e);
                 log.error("Response body: " + e.contentUTF8());  // 응답 내용 추가 로그
                 throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
             }
-//                // 재고 감소 처리
-//                try {
-//                    StockUpdateRequest stockUpdateRequest = new StockUpdateRequest(product.getProductId(), request.getQuantity());
-//                    ApiResponse<Boolean> decreaseStockResponse = productClient.decreaseStock(stockUpdateRequest);
-//                    log.debug("Stock update response: " + decreaseStockResponse);
-//                    if (!Boolean.TRUE.equals(decreaseStockResponse.getData())) {
-//                        throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-//                    }
-//                } catch (FeignException e) {
-//                    log.error("Feign exception occurred: " + e.getMessage(), e);
-//                    throw new BusinessException(ErrorCode.STOCK_DECREASE_FAILED);
-//                }
-//
-//            } catch (FeignException e) {
-//                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
-//            }
 
             // 이벤트 정보 조회 및 가격 계산
             BigDecimal finalPrice;
@@ -167,21 +161,6 @@ public class OrderServiceImpl implements OrderService {
 
         order.updateTotalPrice(totalPrice);
     }
-
-    // 주문 상세 생성 메서드
-//    private OrderDetail createOrderDetail(Order order, OrderRequestDTO request, ProductResponse product, BigDecimal finalPrice) {
-//        return OrderDetail.builder()
-//                .order(order)
-//                .productId(product.getProductId())
-//                .productName(product.getProductName())
-//                .quantity(request.getQuantity())
-//                .price(product.getPrice())
-//                .discountPrice(finalPrice)
-//                .eventProductId(request.getEventId())
-//                .eventProductName(request.getEventId() != null ?
-//                        productClient.getEventInfo(request.getEventId(), product.getProductId()).getData().getEventName() : null)
-//                .build();
-//    }
 
     private String createProductSnapshot(ProductResponse product) {
         try {
@@ -238,24 +217,6 @@ public class OrderServiceImpl implements OrderService {
 
         return ApiResponse.success("반품 처리가 완료되었습니다.");
     }
-
-//    @Override
-//    @Transactional
-//    public ApiResponse<?> markOrderAsDelivered(Long orderId) {
-//        Order order = orderRepository.findById(orderId)
-//                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-//
-//        order.markAsDelivered();
-//
-//        return ApiResponse.success("배송이 완료되었습니다.");
-//    }
-
-    // Helper Methods
-
-//    private Member findMemberById(Long memberId) {
-//        return memberRepository.findById(memberId)
-//                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-//    }
 
     public MemberResponse findMemberById(Long memberId) {
         try {
@@ -406,7 +367,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public ApiResponse<?> processPayment(Long orderId, String paymentMethod) {
+    public PaymentResponseDto processPayment(Long orderId, String paymentMethod) {
         // 결제 프로세스 호출
         return paymentService.processPayment(orderId, paymentMethod);  // 결제 서비스에 위임
     }

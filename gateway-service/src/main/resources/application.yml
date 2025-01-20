@@ -28,6 +28,7 @@ spring:
                 baseMessage: Order Service Filter
                 preLogger: true
                 postLogger: true
+            - RewritePath=/order-service/(?<segment>.*), /${segment}
 
         - id: product-service
           uri: lb://PRODUCT-SERVICE
@@ -39,19 +40,20 @@ spring:
                 baseMessage: Product Service Filter
                 preLogger: true
                 postLogger: true
-            - StripPrefix=1
+            - RewritePath=/product-service/(?<segment>.*), /${segment}
 
         - id: user-service
           uri: lb://USER-SERVICE
           predicates:
             - Path=/user-service/**
           filters:
-            - name: GlobalFilter
-              args:
-                baseMessage: User Service Filter
-                preLogger: true
-                postLogger: true
-            - StripPrefix=1
+            #            - name: GlobalFilter
+            #              args:
+            #                baseMessage: User Service Filter
+            #                preLogger: true
+            #                postLogger: true
+            - RewritePath=/user-service/(?<segment>.*), /${segment}
+      #            - StripPrefix=1
 
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST

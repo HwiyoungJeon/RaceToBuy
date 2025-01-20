@@ -33,7 +33,7 @@ public interface ProductServiceClient {
     ApiResponse<Boolean> decreaseStock(@RequestBody StockUpdateRequest request);
 
     @PostMapping("/products/stock/increase")
-    ApiResponse<Void> increaseStock(@RequestBody StockUpdateRequest request);
+    ApiResponse<Boolean> increaseStock(@RequestBody StockUpdateRequest request);
 
     @GetMapping("/products/events/{eventId}")
     ApiResponse<EventInfoDTO> getEventInfo(
